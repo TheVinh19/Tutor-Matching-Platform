@@ -1,3 +1,4 @@
 # booking-service migrations
 
-Add V1__description.sql when the domain schema is agreed. Never edit an applied migration. This directory intentionally has no business tables yet.
+`V1__booking.sql`: lịch rảnh, kế hoạch (kỳ học), buổi học và 2 EXCLUDE constraint chống trùng lịch. Never edit an applied migration.
+Dữ liệu demo nằm ở `../demo/` và chỉ chạy khi bật Spring profile `demo`.

@@ -1,3 +1,3 @@
 # identity-service migrations
 
-Add V1__description.sql when the domain schema is agreed. Never edit an applied migration. This directory intentionally has no business tables yet.
+`V1__accounts.sql` tạo bảng `accounts`. Never edit an applied migration; add a new `V<n>__description.sql` instead.

@@ -1,0 +1,4 @@
+# Mock demo data (mục 3): demo tutor profiles matching identity's demo accounts.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo
