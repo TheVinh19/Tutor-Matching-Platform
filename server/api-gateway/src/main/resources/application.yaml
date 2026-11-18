@@ -1,0 +1,48 @@
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: account-health
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/v1/identity/health
+              filters:
+                - SetPath=/actuator/health
+            - id: tutor-health
+              uri: ${TUTOR_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/v1/tutors/health
+              filters:
+                - SetPath=/actuator/health
+            - id: learning-health
+              uri: ${BOOKING_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/v1/bookings/health
+              filters:
+                - SetPath=/actuator/health
+            - id: payment-health
+              uri: ${PAYMENT_SERVICE_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/v1/payments/health
+              filters:
+                - SetPath=/actuator/health
+            - id: notification-health
+              uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
+              predicates:
+                - Path=/api/v1/notifications/health
+              filters:
+                - SetPath=/actuator/health
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

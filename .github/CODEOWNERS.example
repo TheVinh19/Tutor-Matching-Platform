@@ -1,0 +1,10 @@
+# Rename to CODEOWNERS and fill real GitHub usernames/teams when ownership is agreed.
+# /server/api-gateway/ @your-team
+# /server/services/identity-service/ @your-team
+# /server/services/tutor-service/ @your-team
+# /server/services/booking-service/ @your-team
+# /server/services/payment-service/ @your-team
+# /server/services/notification-service/ @your-team
+# /web/ @your-team
+# /infra/ @your-team
+# /docs/ @your-team

@@ -1,0 +1,5 @@
+# common-observability
+
+Vị trí dự kiến cho phần common-observability. Chưa có code nghiệp vụ hoặc cấu hình tích hợp hoạt động. Các trách nhiệm chi tiết nằm trong bản đồ nghiệp vụ của dự án.
+
+Xem [bản đồ toàn dự án](../../../docs/architecture/domain-map.md).
