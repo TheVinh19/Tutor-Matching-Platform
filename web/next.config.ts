@@ -1,8 +1,6 @@
 import type { NextConfig } from "next";
+// Browser API calls go through the /bff route handler (adds the JWT from the httpOnly cookie); no rewrites needed.
 const nextConfig: NextConfig = {
   output: "standalone",
-  async rewrites() {
-    return [{ source: "/api/:path*", destination: `${process.env.API_GATEWAY_URL ?? "http://localhost:8080"}/api/:path*` }];
-  },
 };
 export default nextConfig;

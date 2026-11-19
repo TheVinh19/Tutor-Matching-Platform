@@ -57,7 +57,7 @@ npm ci
 npm run dev
 ```
 
-Web rewrite cùng origin `/api/*` tới Gateway. Gateway mở health và API nghiệp vụ identity/tutors/bookings/notifications (xem [docs/api](docs/api/README.md)), chặn `/api/v1/*/internal/**` và API payment. Các trang `/`, `/learner`, `/tutor`, `/admin` vẫn là trang khung (giao diện làm ở Task 4).
+Web (Next.js + Tailwind + shadcn/ui, theme trắng cam) giữ JWT trong cookie httpOnly: `/auth/login` đăng nhập và đặt cookie, `/bff/v1/...` gắn Bearer token rồi chuyển tới gateway `/api/v1/...`. `src/proxy.ts` chặn vào `/learner`, `/tutor`, `/admin` sai vai trò (chỉ phục vụ trải nghiệm; backend vẫn kiểm tra quyền). Đặt `DEMO_PASSWORD` cho web để trang `/login` có nút đăng nhập nhanh. Gateway mở health và API nghiệp vụ identity/tutors/bookings/notifications (xem [docs/api](docs/api/README.md)), chặn `/api/v1/*/internal/**` và API payment.
 
 ## Đăng nhập demo (mock)
 

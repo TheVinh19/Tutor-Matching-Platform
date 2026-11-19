@@ -90,7 +90,7 @@ class PlanController {
         jdbc.sql("INSERT INTO plans (id, learner_id, tutor_id, subject_code, level_code, mode, note, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'REQUESTED')")
                 .params(id, learnerId, r.tutorId(), r.subjectCode(), r.levelCode(), r.mode().name(), r.note() == null ? "" : r.note().strip())
                 .update();
-        notifier.send(r.tutorId(), "PLAN_REQUESTED", "Yêu cầu học mới", "Có Người thuê gửi yêu cầu học " + r.subjectCode() + " " + r.levelCode() + ".", "PLAN", id);
+        notifier.send(r.tutorId(), "PLAN_REQUESTED", "Yêu cầu học mới", "Có Học sinh gửi yêu cầu học " + r.subjectCode() + " " + r.levelCode() + ".", "PLAN", id);
         return new PlanDetail(plans.get(id), List.of());
     }
 
@@ -172,7 +172,7 @@ class PlanController {
                 .params(plan.meetLink(), id).update();
         jdbc.sql("UPDATE plans SET status = 'CONFIRMED', payment_status = 'PAYMENT_PENDING_MOCK', confirmed_at = now(), updated_at = now() WHERE id = ?")
                 .param(id).update();
-        notifier.send(plan.tutorId(), "PLAN_CONFIRMED", "Người thuê đã xác nhận kế hoạch", "Lịch học đã được chốt.", "PLAN", id);
+        notifier.send(plan.tutorId(), "PLAN_CONFIRMED", "Học sinh đã xác nhận kế hoạch", "Lịch học đã được chốt.", "PLAN", id);
         return new PlanDetail(plans.get(id), plans.sessionsOf(id));
     }
 
@@ -199,7 +199,7 @@ class PlanController {
                 "Chỉ hủy được kế hoạch chưa chốt; buổi đã chốt dùng báo bận/hủy buổi");
         jdbc.sql("UPDATE sessions SET status = 'RELEASED', updated_at = now() WHERE plan_id = ? AND status = 'HELD'").param(id).update();
         jdbc.sql("UPDATE plans SET status = 'CANCELLED', closed_at = now(), updated_at = now() WHERE id = ?").param(id).update();
-        notifier.send(plan.tutorId(), "PLAN_CANCELLED", "Người thuê đã hủy yêu cầu", "Lịch giữ (nếu có) đã được giải phóng.", "PLAN", id);
+        notifier.send(plan.tutorId(), "PLAN_CANCELLED", "Học sinh đã hủy yêu cầu", "Lịch giữ (nếu có) đã được giải phóng.", "PLAN", id);
         return new PlanDetail(plans.get(id), plans.sessionsOf(id));
     }
 

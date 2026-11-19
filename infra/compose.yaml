@@ -10,7 +10,7 @@ services:
       PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?Required}
       NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?Required}
 
-    ports: ["127.0.0.1:5432:5432"]
+    ports: ["127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
@@ -145,6 +145,8 @@ services:
     ports: ["127.0.0.1:3000:3000"]
     environment:
       API_GATEWAY_URL: http://api-gateway:8080
+      # Lets the login page offer one-click demo logins (mock login, mục 3). Empty = buttons only fill the email.
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
     depends_on: [api-gateway]
   nginx:
     profiles: [app]
