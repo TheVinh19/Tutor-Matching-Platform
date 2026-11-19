@@ -124,6 +124,14 @@ public class ProfileStore {
         return unknown;
     }
 
+    /** Returns "SUBJECT|TIEU_HOC" pairs whose subject is not allowed at primary level. */
+    public List<String> notPrimarySchool(List<SubjectLevel> subjects) {
+        List<String> codes = subjects.stream().filter(s -> "TIEU_HOC".equals(s.levelCode())).map(SubjectLevel::subjectCode).distinct().toList();
+        if (codes.isEmpty()) return List.of();
+        return jdbc.sql("SELECT code FROM subjects WHERE code IN (:codes) AND NOT primary_school").param("codes", codes)
+                .query(String.class).list().stream().map(c -> c + "|TIEU_HOC").toList();
+    }
+
     private List<String> missing(String table, List<String> codes) {
         if (codes.isEmpty()) return List.of();
         List<String> found = jdbc.sql("SELECT code FROM " + table + " WHERE code IN (:codes)").param("codes", codes).query(String.class).list();

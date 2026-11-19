@@ -156,6 +156,9 @@ class TutorApiPostgresTest {
         call(put("/api/v1/tutors/me/profile"), tutor, "TUTOR", profileJson("ONLINE", "{\"subjectCode\":\"XYZ\",\"levelCode\":\"THPT\"}", ""))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("UNKNOWN_CATALOG_CODE"))
                 .andExpect(jsonPath("$.details[0]").value("XYZ"));
+        call(put("/api/v1/tutors/me/profile"), tutor, "TUTOR", profileJson("ONLINE", "{\"subjectCode\":\"SU\",\"levelCode\":\"TIEU_HOC\"}", ""))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LEVEL_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.details[0]").value("SU|TIEU_HOC"));
         call(put("/api/v1/tutors/me/profile"), tutor, "TUTOR", profileJson("OFFLINE", "{\"subjectCode\":\"LY\",\"levelCode\":\"THPT\"}", ""))
                 .andExpect(status().isOk());
         call(put("/api/v1/tutors/me/profile"), tutor, "TUTOR", profileJson("OFFLINE", "", ""))

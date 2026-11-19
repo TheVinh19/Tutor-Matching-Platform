@@ -87,6 +87,7 @@ export function ProfileEditor() {
                         <td className="py-1.5">{s.name}</td>
                         {catalog.levels.map((l) => {
                           const sl = { subjectCode: s.code, levelCode: l.code };
+                          if (l.code === "TIEU_HOC" && !s.primarySchool) return <td key={l.code} />;
                           return (
                             <td key={l.code} className="text-center">
                               <input type="checkbox" aria-label={`${s.name} ${l.name}`} className="size-4 accent-primary"
