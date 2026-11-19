@@ -45,9 +45,9 @@ class SearchController {
                 @RequestParam(required = false) List<Integer> ranks,
                 @RequestParam(required = false) Mode mode,
                 @RequestParam(required = false) String area,
-                @RequestParam(required = false) @Min(1) @Max(7) Integer day,
-                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime from,
-                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime to,
+                @RequestParam(required = false) List<@Min(1) @Max(7) Integer> day,
+                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) List<LocalTime> from,
+                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) List<LocalTime> to,
                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                 @RequestParam(defaultValue = "0") @Min(0) int page,
@@ -77,16 +77,22 @@ class SearchController {
             where.append(" AND (p.teaching_mode = 'ONLINE' OR EXISTS (SELECT 1 FROM tutor_areas a WHERE a.account_id = p.account_id AND a.area_code = :area))");
             params.add(new Object[] {"area", area});
         }
+        // Each (day[i], from[i], to[i]) is one weekly session; the tutor must be free for all of them.
         if (day != null || from != null || to != null) {
-            if (day == null || from == null || to == null || !from.isBefore(to)) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE_FILTER", "Lọc theo lịch cần đủ thứ, giờ bắt đầu < giờ kết thúc");
+            int n = day == null ? -1 : day.size();
+            if (n < 1 || n > 7 || from == null || to == null || from.size() != n || to.size() != n
+                    || java.util.stream.IntStream.range(0, n).anyMatch(i -> !from.get(i).isBefore(to.get(i)))) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE_FILTER", "Lọc theo lịch cần đủ thứ, giờ bắt đầu < giờ kết thúc (tối đa 7 buổi)");
             }
             LocalDate start = fromDate != null ? fromDate : LocalDate.now();
             LocalDate end = toDate != null ? toDate : start;
             if (end.isBefore(start)) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE_FILTER", "Ngày kết thúc trước ngày bắt đầu");
             }
-            List<UUID> available = booking.tutorsAvailable(day, from, to, start, end);
+            List<UUID> available = new ArrayList<>(booking.tutorsAvailable(day.get(0), from.get(0), to.get(0), start, end));
+            for (int i = 1; i < n && !available.isEmpty(); i++) {
+                available.retainAll(booking.tutorsAvailable(day.get(i), from.get(i), to.get(i), start, end));
+            }
             if (available.isEmpty()) return new Page(List.of(), page, size, 0);
             where.append(" AND p.account_id IN (:available)");
             params.add(new Object[] {"available", available});

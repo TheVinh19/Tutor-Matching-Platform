@@ -27,7 +27,7 @@ Mọi API đi qua gateway `:8080` (hoặc Nginx `:8088`), prefix `/api/v1/<khu>`
 | Method | Path | Quyền | Ghi chú |
 |---|---|---|---|
 | GET | `/api/v1/tutors/catalog` | công khai | môn, cấp học, địa bàn |
-| GET | `/api/v1/tutors/search` | công khai | `subjects=TOAN,ANH` (khớp ≥1 môn, mỗi gia sư 1 lần), `level`, `ranks=1,2`, `mode` (ONLINE/OFFLINE/FLEX), `area`, `day`(1–7)+`from`+`to` (HH:mm) [+`fromDate`,`toDate`], `page`, `size`≤50. Không lọc giá, sắp theo tên |
+| GET | `/api/v1/tutors/search` | công khai | `subjects=TOAN,ANH` (khớp ≥1 môn, mỗi gia sư 1 lần), `level`, `ranks=1,2`, `mode` (ONLINE/OFFLINE/FLEX), `area`, `day`(1–7)+`from`+`to` (HH:mm) [+`fromDate`,`toDate`], lặp bộ ba tối đa 7 lần (`day=2&from=08:00&to=10:00&day=3&from=...`) để lọc gia sư rảnh trọn mọi buổi, `page`, `size`≤50. Không lọc giá, sắp theo tên |
 | GET | `/api/v1/tutors/{accountId}` | công khai | chỉ hồ sơ APPROVED |
 | GET | `/api/v1/tutors/{accountId}/reviews` | công khai | 50 nhận xét mới nhất, không lộ người viết |
 | GET/PUT | `/api/v1/tutors/me/profile` | TUTOR | PUT chỉ khi DRAFT/REJECTED (`409 PROFILE_LOCKED`), mã danh mục sai → `400 UNKNOWN_CATALOG_CODE` |

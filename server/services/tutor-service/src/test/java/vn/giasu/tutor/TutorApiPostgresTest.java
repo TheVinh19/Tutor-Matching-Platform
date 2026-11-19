@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -147,6 +148,15 @@ class TutorApiPostgresTest {
         call(get("/api/v1/tutors/search?subjects=SINH&day=2&from=18:00&to=20:00"), null, null, null)
                 .andExpect(jsonPath("$.total").value(0));
         call(get("/api/v1/tutors/search?day=2&from=18:00"), null, null, null)
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_SCHEDULE_FILTER"));
+
+        // Several sessions: only tutors free for every one of them.
+        UUID other = approvedTutor("ONLINE", "{\"subjectCode\":\"SINH\",\"levelCode\":\"THPT\"}", "");
+        when(booking.tutorsAvailable(eq(2), any(), any(), any(), any())).thenReturn(List.of(tutor, other));
+        when(booking.tutorsAvailable(eq(3), any(), any(), any(), any())).thenReturn(List.of(tutor));
+        call(get("/api/v1/tutors/search?subjects=SINH&day=2&from=08:00&to=10:00&day=3&from=08:00&to=10:00"), null, null, null)
+                .andExpect(jsonPath("$.total").value(1)).andExpect(jsonPath("$.items[0].accountId").value(tutor.toString()));
+        call(get("/api/v1/tutors/search?day=2&from=08:00&to=10:00&day=3&from=08:00"), null, null, null)
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_SCHEDULE_FILTER"));
     }
 
