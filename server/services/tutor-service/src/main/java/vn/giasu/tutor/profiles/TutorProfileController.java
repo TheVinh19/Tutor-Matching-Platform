@@ -68,6 +68,10 @@ class TutorProfileController {
         if (!unknown.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "UNKNOWN_CATALOG_CODE", "Mã danh mục không tồn tại", unknown);
         }
+        List<String> notPrimary = store.notPrimarySchool(subjects);
+        if (!notPrimary.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "LEVEL_NOT_ALLOWED", "Tiểu học chỉ nhận Toán, Ngữ văn, Tiếng Anh", notPrimary);
+        }
         store.upsert(accountId, request.fullName().strip(), request.bio().strip(), request.experience().strip(),
                 request.teachingMode(), subjects, request.areaCodes());
         return store.find(accountId).orElseThrow();

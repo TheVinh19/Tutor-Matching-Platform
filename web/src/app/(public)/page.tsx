@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CalendarCheck, Search, ShieldCheck } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { getSession } from "@/lib/server-session";
 
 const FEATURES = [
   { icon: Search, title: "Tìm đúng gia sư", text: "Lọc theo môn, cấp học, Hạng, hình thức, địa bàn và lịch rảnh." },
@@ -8,7 +9,8 @@ const FEATURES = [
   { icon: ShieldCheck, title: "Hồ sơ đã duyệt", text: "Chỉ gia sư được admin duyệt mới xuất hiện trong tìm kiếm." },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const session = await getSession();
   return (
     <div className="grid gap-12">
       <section className="rounded-2xl bg-gradient-to-br from-accent to-background px-6 py-14 text-center sm:px-12">
@@ -20,7 +22,11 @@ export default function Home() {
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/tutors" className={buttonVariants({ size: "lg" })}>Tìm gia sư</Link>
-          <Link href="/login" className={buttonVariants({ size: "lg", variant: "outline" })}>Đăng nhập</Link>
+          {session ? (
+            <Link href={`/${session.role.toLowerCase()}`} className={buttonVariants({ size: "lg", variant: "outline" })}>Vào trang của tôi</Link>
+          ) : (
+            <Link href="/login" className={buttonVariants({ size: "lg", variant: "outline" })}>Đăng nhập</Link>
+          )}
         </div>
       </section>
       <section className="grid gap-4 sm:grid-cols-3">

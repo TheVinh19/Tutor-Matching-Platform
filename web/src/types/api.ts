@@ -2,7 +2,7 @@
 export type Mode = "ONLINE" | "OFFLINE" | "FLEX";
 export type SubjectLevel = { subjectCode: string; levelCode: string };
 export type Catalog = {
-  subjects: { code: string; name: string }[];
+  subjects: { code: string; name: string; primarySchool: boolean }[];
   levels: { code: string; name: string }[];
   areas: { code: string; province: string; name: string }[];
 };

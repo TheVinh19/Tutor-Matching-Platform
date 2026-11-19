@@ -149,18 +149,24 @@ class BookingApiPostgresTest {
 
         String request = """
                 {"tutorId":"%s","subjectCode":"TOAN","levelCode":"THPT","mode":"ONLINE","sessionsPerWeek":2,"startDate":"%s","weeks":2,"preferredSlots":%s}""";
+        String two = "[{\"dayOfWeek\":1,\"startTime\":\"09:00\"},{\"dayOfWeek\":3,\"startTime\":\"08:00\"}]";
         String three = "[{\"dayOfWeek\":1,\"startTime\":\"09:00\"},{\"dayOfWeek\":3,\"startTime\":\"08:00\"},{\"dayOfWeek\":3,\"startTime\":\"11:00\"}]";
         call(post("/api/v1/bookings/plans"), learner, "LEARNER", request.formatted(tutor, monday, "[{\"dayOfWeek\":1,\"startTime\":\"09:00\"}]"))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("TOO_FEW_SLOTS"));
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("WRONG_SLOT_COUNT"));
+        call(post("/api/v1/bookings/plans"), learner, "LEARNER", request.formatted(tutor, monday, three))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("WRONG_SLOT_COUNT")); // exactly 2, not more
         call(post("/api/v1/bookings/plans"), learner, "LEARNER", request.formatted(tutor, monday,
-                "[{\"dayOfWeek\":1,\"startTime\":\"09:00\"},{\"dayOfWeek\":1,\"startTime\":\"10:30\"}]"))
+                "[{\"dayOfWeek\":3,\"startTime\":\"08:00\"},{\"dayOfWeek\":3,\"startTime\":\"11:00\"}]"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("ONE_SLOT_PER_DAY"));
+        call(post("/api/v1/bookings/plans"), learner, "LEARNER", request.formatted(tutor, monday,
+                "[{\"dayOfWeek\":1,\"startTime\":\"10:30\"},{\"dayOfWeek\":3,\"startTime\":\"08:00\"}]"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("OUTSIDE_AVAILABILITY")); // 10:30-12:30 > 12:00
         call(post("/api/v1/bookings/plans"), learner, "LEARNER", """
-                {"tutorId":"%s","subjectCode":"TOAN","levelCode":"THPT","mode":"ONLINE","preferredSlots":%s}""".formatted(tutor, three))
+                {"tutorId":"%s","subjectCode":"TOAN","levelCode":"THPT","mode":"ONLINE","preferredSlots":%s}""".formatted(tutor, two))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INCOMPLETE_PREFERENCES"));
-        String body = call(post("/api/v1/bookings/plans"), learner, "LEARNER", request.formatted(tutor, monday, three))
+        String body = call(post("/api/v1/bookings/plans"), learner, "LEARNER", request.formatted(tutor, monday, two))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.plan.sessionsPerWeek").value(2))
-                .andExpect(jsonPath("$.preferredSlots", hasSize(3))).andReturn().getResponse().getContentAsString();
+                .andExpect(jsonPath("$.preferredSlots", hasSize(2))).andReturn().getResponse().getContentAsString();
         UUID plan = UUID.fromString(JsonPath.read(body, "$.plan.id"));
 
         String proposeUrl = "/api/v1/bookings/plans/" + plan + "/propose";

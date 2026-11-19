@@ -12,17 +12,19 @@ import { useLoad } from "@/hooks/use-load";
 import { useCatalog } from "@/features/tutors/catalog";
 import type { SearchPage } from "@/types/api";
 
-type Filters = { subjects: string[]; level: string; ranks: string[]; mode: string; area: string; day: string; from: string; to: string };
+type Slot = { day: string; from: string };
+type Filters = { subjects: string[]; level: string; ranks: string[]; mode: string; area: string; slots: Slot[] };
 /** 08:00 ... 20:00 every 30 minutes: every start whose 2h session ends by 22:00. */
 const START_TIMES = Array.from({ length: (DAY_END - SESSION - DAY_START) / STEP + 1 }, (_, i) => toTime(DAY_START + i * STEP));
-const EMPTY: Filters = { subjects: [], level: "", ranks: [], mode: "", area: "", day: "", from: "", to: "" };
+const EMPTY: Filters = { subjects: [], level: "", ranks: [], mode: "", area: "", slots: [] };
 
 function toQuery(f: Filters, page: number) {
   const q = new URLSearchParams({ page: String(page), size: "12" });
   if (f.subjects.length) q.set("subjects", f.subjects.join(","));
   if (f.ranks.length) q.set("ranks", f.ranks.join(","));
   for (const key of ["level", "mode", "area"] as const) if (f[key]) q.set(key, f[key]);
-  if (f.day && f.from && f.to) { q.set("day", f.day); q.set("from", f.from); q.set("to", f.to); }
+  // One day/from/to triple per session; the tutor must be free for all of them.
+  for (const s of f.slots) { q.append("day", s.day); q.append("from", s.from); q.append("to", toTime(toMin(s.from) + SESSION)); }
   return q.toString();
 }
 
@@ -90,19 +92,34 @@ export function TutorSearchPage() {
           </div>
           <fieldset className="grid gap-1.5">
             <legend className="mb-1 text-sm font-medium">Buổi muốn học (2 tiếng)</legend>
-            <div className="grid grid-cols-2 gap-2">
-              <NativeSelect aria-label="Thứ" value={draft.day}
-                onChange={(e) => { const from = draft.from || "08:00"; set(e.target.value ? { day: e.target.value, from, to: toTime(toMin(from) + SESSION) } : { day: "", from: "", to: "" }); }}>
-                <option value="">Thứ bất kỳ</option>
-                {DAY_LABEL.slice(1).map((d, i) => <option key={d} value={i + 1}>{d}</option>)}
-              </NativeSelect>
-              <NativeSelect aria-label="Giờ bắt đầu" value={draft.from} disabled={!draft.day}
-                onChange={(e) => set({ from: e.target.value, to: toTime(toMin(e.target.value) + SESSION) })}>
-                {!draft.day && <option value="">Giờ</option>}
-                {START_TIMES.map((t) => <option key={t} value={t}>{t}–{toTime(toMin(t) + SESSION)}</option>)}
-              </NativeSelect>
-            </div>
-            <p className="text-xs text-muted-foreground">Chỉ hiện gia sư có lịch rảnh trùm trọn buổi đó.</p>
+            {draft.slots.map((s, i) => {
+              const patch = (p: Partial<Slot>) => set({ slots: draft.slots.map((x, j) => (j === i ? { ...x, ...p } : x)) });
+              return (
+                <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                  <NativeSelect aria-label={`Thứ buổi ${i + 1}`} value={s.day} onChange={(e) => patch({ day: e.target.value })}>
+                    {DAY_LABEL.slice(1).map((d, k) => <option key={d} value={k + 1}>{d}</option>)}
+                  </NativeSelect>
+                  <NativeSelect aria-label={`Giờ bắt đầu buổi ${i + 1}`} value={s.from} onChange={(e) => patch({ from: e.target.value })}>
+                    {START_TIMES.map((t) => <option key={t} value={t}>{t}–{toTime(toMin(t) + SESSION)}</option>)}
+                  </NativeSelect>
+                  <Button type="button" size="sm" variant="ghost" aria-label={`Bỏ buổi ${i + 1}`}
+                    onClick={() => set({ slots: draft.slots.filter((_, j) => j !== i) })}>✕</Button>
+                </div>
+              );
+            })}
+            {draft.slots.length < 7 && (
+              <Button type="button" size="sm" variant="outline" className="w-fit"
+                onClick={() => {
+                  // Next unused day after the last pick, same start time, to make "T2, T3, T4 at 18:00" two clicks.
+                  const last = draft.slots.at(-1);
+                  const used = draft.slots.map((s) => s.day);
+                  const day = [1, 2, 3, 4, 5, 6, 7].map((d) => ((Number(last?.day ?? 0) + d - 1) % 7) + 1).find((d) => !used.includes(String(d))) ?? 1;
+                  set({ slots: [...draft.slots, { day: String(day), from: last?.from ?? "08:00" }] });
+                }}>
+                + Thêm buổi
+              </Button>
+            )}
+            <p className="text-xs text-muted-foreground">Chỉ hiện gia sư có lịch rảnh trùm trọn tất cả các buổi đã chọn.</p>
           </fieldset>
           <div className="flex gap-2">
             <Button type="submit" className="flex-1">Tìm</Button>
