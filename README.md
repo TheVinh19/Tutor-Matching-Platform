@@ -27,6 +27,23 @@ docker compose --env-file .env -f infra/compose.yaml up -d
 docker compose --env-file .env -f infra/compose.yaml --profile app up -d --build
 ```
 
+Đưa dữ liệu về mặc định (xóa volume, mất mọi dữ liệu kể cả tài khoản tự tạo; seed demo chạy lại, `.env` giữ `SPRING_PROFILES_ACTIVE=demo`):
+
+```powershell
+docker compose --env-file .env -f infra/compose.yaml --profile app down -v
+docker compose --env-file .env -f infra/compose.yaml --profile app up -d --build
+```
+
+Cập nhật code vừa sửa, giữ nguyên dữ liệu (chỉ build lại và khởi động lại service đã đổi; ví dụ web và tutor-service, đổi tên service tương ứng):
+
+```powershell
+docker compose --env-file .env -f infra/compose.yaml --profile app up -d --build web tutor-service
+```
+
+Chỉ xóa dữ liệu mới thêm, giữ dữ liệu demo (không trả lịch rảnh demo về mặc định): `cd infra; powershell -File postgres/clean-non-demo.ps1`.
+
+Tài khoản demo đăng nhập bằng email `admin@`, `tutor1@`, `tutor2@`, `learner1@`, `learner2@` + `demo.giasu.vn`, mật khẩu là `DEMO_PASSWORD` (mặc định `Demo@12345`).
+
 Website qua Nginx: http://localhost:8088; web: http://localhost:3000; Mailpit: http://localhost:8025. Health mẫu: http://localhost:8088/api/v1/identity/health.
 
 Lần đầu cần tải image/dependency và chờ khởi động. Stack nhiều JVM cần đủ RAM; có thể chỉ bật hạ tầng và chạy service liên quan từ IDE. Các cổng local bind loopback, chưa phải cấu hình production.

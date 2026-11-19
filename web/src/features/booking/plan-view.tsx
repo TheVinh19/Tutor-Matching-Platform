@@ -112,15 +112,16 @@ function ProposeForm({ detail, onDone }: { detail: PlanDetail; onDone: () => voi
   const free = data?.map(norm) ?? [];
   // Options: the learner's sessions still inside free time; older plans without them: any 2h inside free time.
   const options = need !== null ? preferredSlots.map(norm).filter((p) => free.some((z) => inside(z, p))) : free;
-  const valid = picked.filter((p) => options.some((o) => inside(o, p)));
+  // Grid plans: the learner's sessions are the plan, the tutor does not pick.
+  const valid = need !== null ? options : picked.filter((p) => options.some((o) => inside(o, p)));
   const place = (day: number, minute: number) => {
+    if (need !== null) return null;
     const zone = options.find((o) => o.dayOfWeek === day && toMin(o.startTime) <= minute && minute < toMin(o.endTime));
     if (!zone) return null;
-    const start = need !== null ? toMin(zone.startTime) : Math.max(toMin(zone.startTime), Math.min(minute, toMin(zone.endTime) - SESSION));
+    const start = Math.max(toMin(zone.startTime), Math.min(minute, toMin(zone.endTime) - SESSION));
     const b = block(day, start, start + SESSION);
-    // Two sessions of the tutor on one day need the 60-minute gap; the replaced oldest pick does not count.
-    const keep = need !== null && valid.length >= need ? valid.slice(1) : valid;
-    return keep.some((p) => clashes(p, b, GAP)) ? null : b;
+    // Two sessions of the tutor on one day need the 60-minute gap.
+    return valid.some((p) => clashes(p, b, GAP)) ? null : b;
   };
   const ready = need !== null ? valid.length === need : valid.length > 0;
   const endDate = need !== null && plan.endDate ? plan.endDate : addDays(startDate, weeks * 7 - 1);
@@ -141,18 +142,17 @@ function ProposeForm({ detail, onDone }: { detail: PlanDetail; onDone: () => voi
           });
         }}>
           {need !== null ? (
-            <p className="text-sm">Học sinh muốn <span className="font-semibold">{need} buổi/tuần</span>, {weeks} tuần. Bấm chọn đúng {need} buổi trong các buổi học sinh đề xuất.</p>
+            <p className="text-sm">Học sinh muốn <span className="font-semibold">{need} buổi/tuần</span>, {weeks} tuần, vào các buổi dưới đây. Gửi kế hoạch để nhận, hoặc từ chối kèm lý do.</p>
           ) : (
             <div className="grid gap-1.5">
               <Label htmlFor="p-start">Ngày bắt đầu (4 tuần)</Label>
               <Input id="p-start" type="date" required min={addDays(isoToday(), 1)} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
           )}
-          {options.length === 0 && <p className="text-sm text-destructive">Các buổi học sinh đề xuất đều đã kín. Hãy từ chối kèm lý do để học sinh chọn lại.</p>}
-          {/* At most `need` picks; a new pick replaces the oldest one. */}
+          {need !== null && options.length < need && <p className="text-sm text-destructive">Có buổi học sinh chọn đã kín. Hãy từ chối kèm lý do để học sinh chọn lại.</p>}
           <TimeGrid label="Buổi dạy hằng tuần" zones={options} blocks={valid} place={place}
-            onPlace={(b) => setPicked([...(need !== null && valid.length >= need ? valid.slice(1) : valid), b])}
-            onBlockClick={(b) => setPicked(valid.filter((p) => p !== b))} blockHint="bấm để bỏ" />
+            onPlace={(b) => setPicked([...valid, b])}
+            onBlockClick={(b) => { if (need === null) setPicked(valid.filter((p) => p !== b)); }} blockHint={need === null ? "bấm để bỏ" : undefined} />
           <p className={ready ? "text-xs text-muted-foreground" : "text-xs font-medium text-primary"}>
             Đã chọn {valid.length}{need !== null ? `/${need}` : ""} buổi · ≈ {countSessions(valid, from, endDate)} buổi, {fmtDate(from)} → {fmtDate(endDate)}
           </p>

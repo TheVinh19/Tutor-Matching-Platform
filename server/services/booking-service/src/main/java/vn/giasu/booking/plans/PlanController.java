@@ -103,8 +103,12 @@ class PlanController {
             if (!start.isAfter(Schedule.today())) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE", "Ngày bắt đầu phải từ ngày mai");
             }
-            if (preferred.size() < r.sessionsPerWeek()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "TOO_FEW_SLOTS", "Cần chọn ít nhất " + r.sessionsPerWeek() + " ca");
+            // The learner picks the exact weekly sessions, at most one per day; the tutor accepts or rejects them as a whole.
+            if (preferred.size() != r.sessionsPerWeek()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "WRONG_SLOT_COUNT", "Cần chọn đúng " + r.sessionsPerWeek() + " ca");
+            }
+            if (preferred.stream().map(WeeklySlot::dayOfWeek).distinct().count() != preferred.size()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "ONE_SLOT_PER_DAY", "Mỗi ngày chỉ chọn một ca");
             }
             checkInsideAvailability(r.tutorId(), r.mode().name(), preferred, start, end);
         }
