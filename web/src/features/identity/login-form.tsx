@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ export function LoginForm({ demoPassword }: { demoPassword: string | null }) {
 
   const login = (e: string, p: string) => run(async () => {
     const response = await fetch("/auth/login", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: e, password: p }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ login: e, password: p }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new ApiError(response.status, data.code ?? "LOGIN_FAILED", data.message ?? "Đăng nhập thất bại", data.details);
@@ -42,13 +43,13 @@ export function LoginForm({ demoPassword }: { demoPassword: string | null }) {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">Đăng nhập</CardTitle>
-          <CardDescription>Dùng email và mật khẩu của bạn.</CardDescription>
+          <CardDescription>Dùng tên đăng nhập và mật khẩu của bạn.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4" onSubmit={(ev) => { ev.preventDefault(); void login(email, password); }}>
             <div className="grid gap-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" autoComplete="username" required value={email} onChange={(ev) => setEmail(ev.target.value)} />
+              <Label htmlFor="email">Tên đăng nhập</Label>
+              <Input id="email" autoComplete="username" required placeholder="Tên đăng nhập hoặc email demo" value={email} onChange={(ev) => setEmail(ev.target.value)} />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="password">Mật khẩu</Label>
@@ -56,6 +57,9 @@ export function LoginForm({ demoPassword }: { demoPassword: string | null }) {
             </div>
             <ErrorBox error={error} />
             <Button type="submit" size="lg" disabled={pending}>{pending ? "Đang đăng nhập…" : "Đăng nhập"}</Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Chưa có tài khoản? <Link href="/register" className="font-medium text-primary hover:underline">Đăng ký</Link>
+            </p>
           </form>
         </CardContent>
       </Card>

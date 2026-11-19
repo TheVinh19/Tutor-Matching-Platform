@@ -8,7 +8,7 @@ export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const session = decodeSession(request.cookies.get(SESSION_COOKIE)?.value);
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname === "/register") {
     return session ? NextResponse.redirect(new URL(HOME_BY_ROLE[session.role], request.url)) : NextResponse.next();
   }
   const area = Object.keys(AREA_ROLE).find((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));
@@ -24,4 +24,4 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/login", "/learner/:path*", "/tutor/:path*", "/admin/:path*"] };
+export const config = { matcher: ["/login", "/register", "/learner/:path*", "/tutor/:path*", "/admin/:path*"] };

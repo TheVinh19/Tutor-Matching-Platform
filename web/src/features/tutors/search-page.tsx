@@ -4,15 +4,17 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Empty, ErrorBox, NativeSelect, PageTitle } from "@/components/common";
 import { DAY_LABEL, MODE_LABEL } from "@/config/labels";
+import { DAY_END, DAY_START, SESSION, STEP, toMin, toTime } from "@/components/time-grid";
 import { useLoad } from "@/hooks/use-load";
 import { useCatalog } from "@/features/tutors/catalog";
 import type { SearchPage } from "@/types/api";
 
 type Filters = { subjects: string[]; level: string; ranks: string[]; mode: string; area: string; day: string; from: string; to: string };
+/** 08:00 ... 20:00 every 30 minutes: every start whose 2h session ends by 22:00. */
+const START_TIMES = Array.from({ length: (DAY_END - SESSION - DAY_START) / STEP + 1 }, (_, i) => toTime(DAY_START + i * STEP));
 const EMPTY: Filters = { subjects: [], level: "", ranks: [], mode: "", area: "", day: "", from: "", to: "" };
 
 function toQuery(f: Filters, page: number) {
@@ -35,12 +37,11 @@ export function TutorSearchPage() {
   const [page, setPage] = useState(0);
   const { data, error, loading } = useLoad<SearchPage>(`/v1/tutors/search?${toQuery(applied, page)}`);
   const set = (patch: Partial<Filters>) => setDraft({ ...draft, ...patch });
-  const partialSchedule = [draft.day, draft.from, draft.to].filter(Boolean).length % 3 !== 0;
 
   return (
     <>
       <PageTitle title="Tìm gia sư" description="Chọn nhiều môn: gia sư dạy ít nhất một môn sẽ hiện ra, mỗi người một lần. Không lọc theo giá." />
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
         <form className="grid content-start gap-4 rounded-xl border p-4" onSubmit={(e) => { e.preventDefault(); setPage(0); setApplied(draft); }}>
           <fieldset className="grid gap-1.5">
             <legend className="mb-1 text-sm font-medium">Môn học</legend>
@@ -88,16 +89,20 @@ export function TutorSearchPage() {
             </NativeSelect>
           </div>
           <fieldset className="grid gap-1.5">
-            <legend className="mb-1 text-sm font-medium">Lịch muốn học</legend>
-            <NativeSelect aria-label="Thứ" value={draft.day} onChange={(e) => set({ day: e.target.value })}>
-              <option value="">Không lọc lịch</option>
-              {DAY_LABEL.slice(1).map((d, i) => <option key={d} value={i + 1}>{d}</option>)}
-            </NativeSelect>
+            <legend className="mb-1 text-sm font-medium">Buổi muốn học (2 tiếng)</legend>
             <div className="grid grid-cols-2 gap-2">
-              <Input type="time" aria-label="Từ giờ" min="08:00" max="22:00" value={draft.from} onChange={(e) => set({ from: e.target.value })} />
-              <Input type="time" aria-label="Đến giờ" min="08:00" max="22:00" value={draft.to} onChange={(e) => set({ to: e.target.value })} />
+              <NativeSelect aria-label="Thứ" value={draft.day}
+                onChange={(e) => { const from = draft.from || "08:00"; set(e.target.value ? { day: e.target.value, from, to: toTime(toMin(from) + SESSION) } : { day: "", from: "", to: "" }); }}>
+                <option value="">Thứ bất kỳ</option>
+                {DAY_LABEL.slice(1).map((d, i) => <option key={d} value={i + 1}>{d}</option>)}
+              </NativeSelect>
+              <NativeSelect aria-label="Giờ bắt đầu" value={draft.from} disabled={!draft.day}
+                onChange={(e) => set({ from: e.target.value, to: toTime(toMin(e.target.value) + SESSION) })}>
+                {!draft.day && <option value="">Giờ</option>}
+                {START_TIMES.map((t) => <option key={t} value={t}>{t}–{toTime(toMin(t) + SESSION)}</option>)}
+              </NativeSelect>
             </div>
-            {partialSchedule && <p className="text-xs text-muted-foreground">Cần chọn đủ thứ, giờ bắt đầu và giờ kết thúc.</p>}
+            <p className="text-xs text-muted-foreground">Chỉ hiện gia sư có lịch rảnh trùm trọn buổi đó.</p>
           </fieldset>
           <div className="flex gap-2">
             <Button type="submit" className="flex-1">Tìm</Button>

@@ -132,6 +132,57 @@ class BookingApiPostgresTest {
     }
 
     @Test
+    void calendarFlowTutorPicksFromLearnerSlots() throws Exception {
+        UUID tutor = UUID.randomUUID();
+        UUID learner = UUID.randomUUID();
+        String saveUrl = "/api/v1/bookings/availability/me";
+        call(put(saveUrl), tutor, "TUTOR", """
+                {"windows":[{"dayOfWeek":1,"startTime":"08:00","endTime":"09:30"}]}""")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_TIME_RANGE"));
+        call(put(saveUrl), tutor, "TUTOR", """
+                {"windows":[{"dayOfWeek":1,"startTime":"08:00","endTime":"12:00"},{"dayOfWeek":1,"startTime":"11:00","endTime":"14:00"}]}""")
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("AVAILABILITY_OVERLAP"));
+        // Monday 08-12 and Wednesday 08-13: the two examples from the spec.
+        call(put(saveUrl), tutor, "TUTOR", """
+                {"windows":[{"dayOfWeek":1,"startTime":"08:00","endTime":"12:00"},{"dayOfWeek":3,"startTime":"08:00","endTime":"13:00"}]}""")
+                .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(2)));
+
+        String request = """
+                {"tutorId":"%s","subjectCode":"TOAN","levelCode":"THPT","mode":"ONLINE","sessionsPerWeek":2,"startDate":"%s","weeks":2,"preferredSlots":%s}""";
+        String three = "[{\"dayOfWeek\":1,\"startTime\":\"09:00\"},{\"dayOfWeek\":3,\"startTime\":\"08:00\"},{\"dayOfWeek\":3,\"startTime\":\"11:00\"}]";
+        call(post("/api/v1/bookings/plans"), learner, "LEARNER", request.formatted(tutor, monday, "[{\"dayOfWeek\":1,\"startTime\":\"09:00\"}]"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("TOO_FEW_SLOTS"));
+        call(post("/api/v1/bookings/plans"), learner, "LEARNER", request.formatted(tutor, monday,
+                "[{\"dayOfWeek\":1,\"startTime\":\"09:00\"},{\"dayOfWeek\":1,\"startTime\":\"10:30\"}]"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("OUTSIDE_AVAILABILITY")); // 10:30-12:30 > 12:00
+        call(post("/api/v1/bookings/plans"), learner, "LEARNER", """
+                {"tutorId":"%s","subjectCode":"TOAN","levelCode":"THPT","mode":"ONLINE","preferredSlots":%s}""".formatted(tutor, three))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INCOMPLETE_PREFERENCES"));
+        String body = call(post("/api/v1/bookings/plans"), learner, "LEARNER", request.formatted(tutor, monday, three))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.plan.sessionsPerWeek").value(2))
+                .andExpect(jsonPath("$.preferredSlots", hasSize(3))).andReturn().getResponse().getContentAsString();
+        UUID plan = UUID.fromString(JsonPath.read(body, "$.plan.id"));
+
+        String proposeUrl = "/api/v1/bookings/plans/" + plan + "/propose";
+        call(post(proposeUrl), tutor, "TUTOR", """
+                {"slots":[{"dayOfWeek":1,"startTime":"09:00"}]}""").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("WRONG_SLOT_COUNT"));
+        call(post(proposeUrl), tutor, "TUTOR", """
+                {"slots":[{"dayOfWeek":1,"startTime":"09:00"},{"dayOfWeek":3,"startTime":"10:00"}]}""")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("NOT_PREFERRED_SLOT"));
+        call(post(proposeUrl), tutor, "TUTOR", """
+                {"slots":[{"dayOfWeek":1,"startTime":"09:00"},{"dayOfWeek":3,"startTime":"08:00"}]}""")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.sessions", hasSize(4)))
+                .andExpect(jsonPath("$.plan.endDate").value(monday.plusWeeks(2).minusDays(1).toString()));
+
+        // Mon 08-12 minus 09-11 (+60 min each side) leaves nothing >= 2h; Wed 08-13 minus 08-10 (+60) leaves 11-13.
+        call(get("/api/v1/bookings/availability/tutors/" + tutor + "/free?weeks=2&fromDate=" + monday), null, null, null)
+                .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].dayOfWeek").value(3))
+                .andExpect(jsonPath("$[0].startTime").value(org.hamcrest.Matchers.startsWith("11:00")))
+                .andExpect(jsonPath("$[0].endTime").value(org.hamcrest.Matchers.startsWith("13:00")));
+    }
+
+    @Test
     void requestProposeConfirmCompleteAndPlanCloses() throws Exception {
         UUID tutor = UUID.randomUUID();
         UUID learner = UUID.randomUUID();

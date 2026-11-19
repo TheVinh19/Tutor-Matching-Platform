@@ -31,3 +31,6 @@ const dateOnly = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh"
 export const fmtDateTime = (iso?: string | null) => (iso ? dateTime.format(new Date(iso)) : "—");
 export const fmtDate = (iso?: string | null) => (iso ? dateOnly.format(new Date(iso)) : "—");
 export const fmtTime = (t: string) => t.slice(0, 5);
+const clock = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit" });
+/** "10:00" from an ISO instant, in Vietnam time. */
+export const fmtClock = (iso: string) => clock.format(new Date(iso));

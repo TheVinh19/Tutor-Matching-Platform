@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ErrorBox, ReasonAction, StatusBadge, useAction } from "@/components/common";
 import { SESSION_STATUS } from "@/config/labels";
-import { api, fmtDateTime } from "@/lib/api";
+import { api, fmtClock, fmtDateTime } from "@/lib/api";
 import type { Session } from "@/types/api";
 
 type Role = "LEARNER" | "TUTOR";
@@ -24,7 +24,7 @@ export function SessionCard({ session: s, role, onChange }: { session: Session; 
   return (
     <li className="grid gap-2 rounded-lg border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-medium">{fmtDateTime(s.startAt)} – {fmtDateTime(s.endAt).slice(-5)}</span>
+        <span className="font-medium">{fmtDateTime(s.startAt)} · đến {fmtClock(s.endAt)}</span>
         <StatusBadge value={SESSION_STATUS[s.status]} />
       </div>
       {s.meetLink && (

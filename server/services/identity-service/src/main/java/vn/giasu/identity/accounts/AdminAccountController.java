@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/identity/admin/accounts")
 @PreAuthorize("hasRole('ADMIN')")
 class AdminAccountController {
-    record AccountView(UUID id, String email, Account.Role role, Account.Status status) {}
+    record AccountView(UUID id, String username, String email, Account.Role role, Account.Status status) {}
 
     private final AccountRepository accounts;
 
@@ -21,8 +21,8 @@ class AdminAccountController {
     // shortcut: no paging, fine for demo-sized data; add Pageable when real sign-up exists.
     @GetMapping
     List<AccountView> list() {
-        return accounts.findAll(Sort.by("email")).stream()
-                .map(a -> new AccountView(a.getId(), a.getEmail(), a.getRole(), a.getStatus()))
+        return accounts.findAll(Sort.by("createdAt")).stream()
+                .map(a -> new AccountView(a.getId(), a.getUsername(), a.getEmail(), a.getRole(), a.getStatus()))
                 .toList();
     }
 }

@@ -34,7 +34,7 @@ export async function SiteHeader() {
             <LogoutButton />
           </div>
         ) : (
-          <Link href="/login" className={buttonVariants({ size: "sm" })}>Đăng nhập</Link>
+          <div className="flex gap-2"><Link href="/register" className={buttonVariants({ size: "sm", variant: "outline" })}>Đăng ký</Link><Link href="/login" className={buttonVariants({ size: "sm" })}>Đăng nhập</Link></div>
         )}
       </div>
     </header>

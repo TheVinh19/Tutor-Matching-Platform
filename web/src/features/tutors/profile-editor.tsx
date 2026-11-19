@@ -118,11 +118,15 @@ export function ProfileEditor() {
         <div className="flex flex-wrap items-center gap-3 lg:col-span-2">
           <ErrorBox error={save.error ?? submit.error} />
           <Button type="submit" variant="outline" disabled={locked || save.pending}>Lưu nháp</Button>
-          <Button type="button" disabled={locked || noProfile || submit.pending}
-            onClick={() => submit.run(async () => { await api("/v1/tutors/me/profile/submit", { method: "POST" }); await reload(); })}>
+          {/* Save what is on screen first, so ticks not yet saved as draft are included. */}
+          <Button type="button" disabled={locked || submit.pending}
+            onClick={() => submit.run(async () => {
+              await api("/v1/tutors/me/profile", { method: "PUT", body: form });
+              await api("/v1/tutors/me/profile/submit", { method: "POST" });
+              await reload();
+            })}>
             Gửi duyệt
           </Button>
-          {noProfile && <span className="text-sm text-muted-foreground">Lưu nháp trước, sau đó gửi duyệt.</span>}
         </div>
       </form>
     </>

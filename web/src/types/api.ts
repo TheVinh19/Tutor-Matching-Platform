@@ -29,6 +29,8 @@ export type Plan = {
   note: string; status: PlanStatus; paymentStatus: string | null; rejectReason: string | null;
   startDate: string | null; endDate: string | null; holdExpiresAt: string | null; meetLink: string | null;
   createdAt: string; proposedAt: string | null; confirmedAt: string | null; closedAt: string | null;
+  /** Grid flow; null on older free-text requests. */
+  sessionsPerWeek: number | null; weeks: number | null;
 };
 export type SessionStatus = "HELD" | "SCHEDULED" | "CANCEL_REPORTED" | "COMPLETED_PENDING_CONFIRM" | "CONFIRMED" | "DISPUTED" | "CANCELLED" | "RELEASED";
 export type Session = {
@@ -36,6 +38,8 @@ export type Session = {
   meetLink: string | null; cancelReason: string | null; cancelledBy: string | null; cancelledAt: string | null;
   completedAt: string | null; confirmDeadline: string | null; confirmedAt: string | null; autoConfirmed: boolean; disputeReason: string | null;
 };
-export type PlanDetail = { plan: Plan; sessions: Session[] };
+export type WeekCell = { dayOfWeek: number; startTime: string };
+export type WeekWindow = { dayOfWeek: number; startTime: string; endTime: string };
+export type PlanDetail = { plan: Plan; sessions: Session[]; preferredSlots: WeekCell[] };
 
 export type Notice = { id: string; type: string; title: string; body: string; refType: string | null; refId: string | null; createdAt: string; readAt: string | null };

@@ -1,19 +1,19 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Empty, ErrorBox, NativeSelect, ReasonAction, StatusBadge, useAction } from "@/components/common";
-import { DAY_LABEL, MODE_LABEL, PLAN_STATUS } from "@/config/labels";
+import { Empty, ErrorBox, ReasonAction, StatusBadge, useAction } from "@/components/common";
+import { addDays, block, clashes, countSessions, describeBlocks, GAP, inside, isoToday, norm, SESSION, TimeGrid, toMin, type Block } from "@/components/time-grid";
+import { MODE_LABEL, PLAN_STATUS } from "@/config/labels";
 import { useLoad } from "@/hooks/use-load";
-import { api, fmtDate, fmtDateTime, fmtTime } from "@/lib/api";
+import { api, fmtDate, fmtDateTime } from "@/lib/api";
 import { SessionCard } from "@/features/booking/session-card";
 import { useCatalog } from "@/features/tutors/catalog";
-import type { PlanDetail, Slot } from "@/types/api";
+import type { PlanDetail, WeekWindow } from "@/types/api";
 
 type Role = "LEARNER" | "TUTOR";
 
@@ -41,13 +41,13 @@ export function PlanView({ id, role }: { id: string; role: Role }) {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-6 lg:grid-cols-[1fr_440px]">
         <Card>
           <CardHeader><CardTitle>Các buổi học ({sessions.length})</CardTitle></CardHeader>
           <CardContent>
             {sessions.length ? (
               <ul className="grid gap-2">{sessions.map((s) => <SessionCard key={s.id} session={s} role={role} onChange={reload} />)}</ul>
-            ) : <Empty>{plan.status === "REQUESTED" ? "Gia sư chưa lập kế hoạch." : "Không có buổi nào."}</Empty>}
+            ) : <Empty>{plan.status === "REQUESTED" ? "Gia sư chưa chốt lịch." : "Không có buổi nào."}</Empty>}
           </CardContent>
         </Card>
 
@@ -56,7 +56,11 @@ export function PlanView({ id, role }: { id: string; role: Role }) {
             <CardHeader><CardTitle>Thông tin</CardTitle></CardHeader>
             <CardContent className="grid gap-1.5 text-sm">
               <p><span className="font-medium">Hình thức:</span> {MODE_LABEL[plan.mode]}</p>
-              {plan.note && <p><span className="font-medium">Nhu cầu:</span> {plan.note}</p>}
+              {plan.sessionsPerWeek !== null && <p><span className="font-medium">Nhu cầu:</span> {plan.sessionsPerWeek} buổi/tuần · {plan.weeks} tuần</p>}
+              {plan.status === "REQUESTED" && data.preferredSlots.length > 0 && (
+                <p><span className="font-medium">Ca học sinh chọn:</span> {describeBlocks(data.preferredSlots.map(norm))}</p>
+              )}
+              {plan.note && <p><span className="font-medium">Lời nhắn:</span> {plan.note}</p>}
               {plan.startDate && <p><span className="font-medium">Thời gian:</span> {fmtDate(plan.startDate)} → {fmtDate(plan.endDate)}</p>}
               {plan.status === "PROPOSED" && plan.holdExpiresAt && (
                 <p className="font-medium text-primary">Giữ lịch đến {fmtDateTime(plan.holdExpiresAt)}</p>
@@ -81,8 +85,8 @@ export function PlanView({ id, role }: { id: string; role: Role }) {
           {role === "LEARNER" && plan.status === "COMPLETED" && <ReviewForm planId={plan.id} closedAt={plan.closedAt} />}
           {role === "TUTOR" && plan.status === "REQUESTED" && (
             <>
-              <ProposeForm planId={plan.id} onDone={reload} />
-              <ReasonAction label="Từ chối yêu cầu" variant="destructive" placeholder="Lý do từ chối" onSubmit={(reason) => post("reject", { reason })} />
+              <ProposeForm detail={data} onDone={reload} />
+              <ReasonAction label="Từ chối yêu cầu" variant="destructive" placeholder="Lý do từ chối, VD: các ca này em đã kín" onSubmit={(reason) => post("reject", { reason })} />
             </>
           )}
         </div>
@@ -91,68 +95,76 @@ export function PlanView({ id, role }: { id: string; role: Role }) {
   );
 }
 
-type SlotRow = { dayOfWeek: number; startTime: string };
-
-function ProposeForm({ planId, onDone }: { planId: string; onDone: () => void }) {
-  const { data: availability } = useLoad<Slot[]>("/v1/bookings/availability/me");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+/**
+ * Tutor ticks the weekly cells to teach. Grid-flow plans: exactly sessionsPerWeek of the learner's cells, period fixed by the learner.
+ * Older free-text plans: any cells inside the tutor's availability, tutor picks the start date (4 weeks).
+ */
+function ProposeForm({ detail, onDone }: { detail: PlanDetail; onDone: () => void }) {
+  const { plan, preferredSlots } = detail;
+  const need = plan.sessionsPerWeek;
+  const [startDate, setStartDate] = useState(plan.startDate ?? addDays(isoToday(), 1));
+  const weeks = plan.weeks ?? 4;
+  const { data } = useLoad<WeekWindow[]>(startDate ? `/v1/bookings/availability/tutors/${plan.tutorId}/free?fromDate=${startDate}&weeks=${weeks}&mode=${plan.mode}` : null);
+  const [picked, setPicked] = useState<Block[]>([]);
   const [meetLink, setMeetLink] = useState("");
-  const [slots, setSlots] = useState<SlotRow[]>([{ dayOfWeek: 1, startTime: "08:00" }]);
   const { pending, error, run } = useAction();
-  const update = (i: number, patch: Partial<SlotRow>) => setSlots(slots.map((s, j) => (i === j ? { ...s, ...patch } : s)));
+
+  const free = data?.map(norm) ?? [];
+  // Options: the learner's sessions still inside free time; older plans without them: any 2h inside free time.
+  const options = need !== null ? preferredSlots.map(norm).filter((p) => free.some((z) => inside(z, p))) : free;
+  const valid = picked.filter((p) => options.some((o) => inside(o, p)));
+  const place = (day: number, minute: number) => {
+    const zone = options.find((o) => o.dayOfWeek === day && toMin(o.startTime) <= minute && minute < toMin(o.endTime));
+    if (!zone) return null;
+    const start = need !== null ? toMin(zone.startTime) : Math.max(toMin(zone.startTime), Math.min(minute, toMin(zone.endTime) - SESSION));
+    const b = block(day, start, start + SESSION);
+    // Two sessions of the tutor on one day need the 60-minute gap; the replaced oldest pick does not count.
+    const keep = need !== null && valid.length >= need ? valid.slice(1) : valid;
+    return keep.some((p) => clashes(p, b, GAP)) ? null : b;
+  };
+  const ready = need !== null ? valid.length === need : valid.length > 0;
+  const endDate = need !== null && plan.endDate ? plan.endDate : addDays(startDate, weeks * 7 - 1);
+  const from = startDate > isoToday() ? startDate : isoToday();
 
   return (
     <Card className="border-primary/40">
-      <CardHeader><CardTitle>Lập kế hoạch học</CardTitle></CardHeader>
+      <CardHeader><CardTitle>Chốt lịch học</CardTitle></CardHeader>
       <CardContent>
         <form className="grid gap-3" onSubmit={(e) => {
           e.preventDefault();
           void run(async () => {
-            await api(`/v1/bookings/plans/${planId}/propose`, {
-              method: "POST", body: { startDate, endDate: endDate || null, slots, meetLink: meetLink || null },
+            await api(`/v1/bookings/plans/${plan.id}/propose`, {
+              method: "POST",
+              body: { startDate: need !== null ? null : startDate, slots: valid.map((p) => ({ dayOfWeek: p.dayOfWeek, startTime: p.startTime })), meetLink: meetLink || null },
             });
             onDone();
           });
         }}>
-          <div className="grid grid-cols-2 gap-2">
+          {need !== null ? (
+            <p className="text-sm">Học sinh muốn <span className="font-semibold">{need} buổi/tuần</span>, {weeks} tuần. Bấm chọn đúng {need} buổi trong các buổi học sinh đề xuất.</p>
+          ) : (
             <div className="grid gap-1.5">
-              <Label htmlFor="p-start">Ngày bắt đầu</Label>
-              <Input id="p-start" type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <Label htmlFor="p-start">Ngày bắt đầu (4 tuần)</Label>
+              <Input id="p-start" type="date" required min={addDays(isoToday(), 1)} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="p-end">Ngày kết thúc</Label>
-              <Input id="p-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">Bỏ trống ngày kết thúc = 4 tuần. Mỗi ca 120 phút, cách ca khác ít nhất 60 phút.</p>
-          <fieldset className="grid gap-2">
-            <legend className="mb-1 text-sm font-medium">Ca học hằng tuần</legend>
-            {slots.map((s, i) => (
-              <div key={i} className="flex gap-2">
-                <NativeSelect aria-label="Thứ" value={s.dayOfWeek} onChange={(e) => update(i, { dayOfWeek: Number(e.target.value) })}>
-                  {DAY_LABEL.slice(1).map((d, k) => <option key={d} value={k + 1}>{d}</option>)}
-                </NativeSelect>
-                <Input type="time" aria-label="Giờ bắt đầu" required min="08:00" max="20:00" value={s.startTime}
-                  onChange={(e) => update(i, { startTime: e.target.value })} className="w-32" />
-                <Button type="button" size="icon" variant="ghost" aria-label="Xóa ca" disabled={slots.length === 1}
-                  onClick={() => setSlots(slots.filter((_, j) => j !== i))}><Trash2 /></Button>
-              </div>
-            ))}
-            <Button type="button" size="sm" variant="outline" className="w-fit" disabled={slots.length >= 14}
-              onClick={() => setSlots([...slots, { dayOfWeek: 3, startTime: "08:00" }])}><Plus /> Thêm ca</Button>
-          </fieldset>
-          {availability && availability.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Lịch rảnh của bạn: {availability.map((a) => `${DAY_LABEL[a.dayOfWeek]} ${fmtTime(a.startTime)}–${fmtTime(a.endTime)}`).join("; ")}
-            </p>
           )}
-          <div className="grid gap-1.5">
-            <Label htmlFor="p-link">Link học online (tùy chọn)</Label>
-            <Input id="p-link" type="url" pattern="https://.*" placeholder="https://meet.google.com/..." value={meetLink} onChange={(e) => setMeetLink(e.target.value)} />
-          </div>
+          {options.length === 0 && <p className="text-sm text-destructive">Các buổi học sinh đề xuất đều đã kín. Hãy từ chối kèm lý do để học sinh chọn lại.</p>}
+          {/* At most `need` picks; a new pick replaces the oldest one. */}
+          <TimeGrid label="Buổi dạy hằng tuần" zones={options} blocks={valid} place={place}
+            onPlace={(b) => setPicked([...(need !== null && valid.length >= need ? valid.slice(1) : valid), b])}
+            onBlockClick={(b) => setPicked(valid.filter((p) => p !== b))} blockHint="bấm để bỏ" />
+          <p className={ready ? "text-xs text-muted-foreground" : "text-xs font-medium text-primary"}>
+            Đã chọn {valid.length}{need !== null ? `/${need}` : ""} buổi · ≈ {countSessions(valid, from, endDate)} buổi, {fmtDate(from)} → {fmtDate(endDate)}
+          </p>
+          {plan.mode === "ONLINE" && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="p-link">Link học online (tùy chọn)</Label>
+              <Input id="p-link" type="url" pattern="https://.*" placeholder="https://meet.google.com/..." value={meetLink} onChange={(e) => setMeetLink(e.target.value)} />
+            </div>
+          )}
           <ErrorBox error={error} />
-          <Button type="submit" disabled={pending}>{pending ? "Đang gửi…" : "Gửi kế hoạch"}</Button>
+          <Button type="submit" disabled={!ready || pending}>{pending ? "Đang gửi…" : "Gửi kế hoạch cho học sinh"}</Button>
+          <p className="text-xs text-muted-foreground">Các buổi được giữ tối đa 24 giờ chờ học sinh xác nhận.</p>
         </form>
       </CardContent>
     </Card>

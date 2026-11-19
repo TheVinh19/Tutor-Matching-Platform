@@ -52,12 +52,12 @@ class AuthApiTest {
         when(accounts.findByEmail("learner1@demo.giasu.vn")).thenReturn(Optional.of(learner));
         when(accounts.findById(ADMIN_ID)).thenReturn(Optional.of(admin));
         when(accounts.findById(LEARNER_ID)).thenReturn(Optional.of(learner));
-        when(accounts.findAll(Sort.by("email"))).thenReturn(List.of(admin, learner));
+        when(accounts.findAll(Sort.by("createdAt"))).thenReturn(List.of(admin, learner));
     }
 
     String login(String email, String password) throws Exception {
         String body = mvc.perform(post("/api/v1/identity/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}"))
+                        .content("{\"login\":\"" + email + "\",\"password\":\"" + password + "\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         return JsonPath.read(body, "$.accessToken");
     }
@@ -70,7 +70,7 @@ class AuthApiTest {
     @Test
     void loginReturnsTokenAndRoleAndEmailIsCaseInsensitive() throws Exception {
         mvc.perform(post("/api/v1/identity/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"Learner1@Demo.GiaSu.vn\",\"password\":\"" + PASSWORD + "\"}"))
+                        .content("{\"login\":\"Learner1@Demo.GiaSu.vn\",\"password\":\"" + PASSWORD + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.expiresIn").value(7200))
@@ -91,7 +91,7 @@ class AuthApiTest {
     void wrongPasswordAndUnknownEmailGiveSame401() throws Exception {
         for (String email : new String[] {"learner1@demo.giasu.vn", "nobody@demo.giasu.vn"}) {
             mvc.perform(post("/api/v1/identity/auth/login").contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"email\":\"" + email + "\",\"password\":\"wrong-password\"}"))
+                            .content("{\"login\":\"" + email + "\",\"password\":\"wrong-password\"}"))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"))
                     .andExpect(jsonPath("$.requestId").isNotEmpty());
@@ -101,7 +101,7 @@ class AuthApiTest {
     @Test
     void invalidBodyGives400WithFieldDetails() throws Exception {
         mvc.perform(post("/api/v1/identity/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"not-an-email\",\"password\":\"\"}"))
+                        .content("{\"login\":\"\",\"password\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.details", hasSize(2)));
@@ -132,5 +132,30 @@ class AuthApiTest {
     void unknownApiPathGivesStandard404() throws Exception {
         mvc.perform(get("/api/v1/identity/nope").header("Authorization", "Bearer " + login("admin@demo.giasu.vn", PASSWORD)))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void registerCreatesTutorOrLearnerButNeverAdmin() throws Exception {
+        when(accounts.saveAndFlush(org.mockito.ArgumentMatchers.any(Account.class))).thenAnswer(inv -> inv.getArgument(0));
+        mvc.perform(post("/api/v1/identity/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"giasu_moi\",\"password\":\"matkhau123\",\"role\":\"TUTOR\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.role").value("TUTOR"))
+                .andExpect(jsonPath("$.accessToken").isNotEmpty());
+        mvc.perform(post("/api/v1/identity/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"hacker\",\"password\":\"matkhau123\",\"role\":\"ADMIN\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/identity/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"a b\",\"password\":\"short\",\"role\":\"LEARNER\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.details", hasSize(2)));
+    }
+
+    @Test
+    void registerRejectsTakenUsername() throws Exception {
+        when(accounts.findByUsername("hocsinh1")).thenReturn(Optional.of(
+                Account.withUsername(UUID.randomUUID(), "hocsinh1", encoder.encode(PASSWORD), Account.Role.LEARNER)));
+        mvc.perform(post("/api/v1/identity/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"HocSinh1\",\"password\":\"matkhau123\",\"role\":\"LEARNER\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("USERNAME_TAKEN"));
     }
 }
