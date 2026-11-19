@@ -1,0 +1,4 @@
+# Mock demo data (mục 3): tutor1 availability + a confirmed plan for learner1.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo

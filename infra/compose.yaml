@@ -50,6 +50,8 @@ services:
       args:
         MODULE: services/identity-service
     environment:
+      JWT_SECRET: ${JWT_SECRET:?Required}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
       DB_URL: jdbc:postgresql://postgres:5432/account_db
       DB_USERNAME: account_app
       DB_PASSWORD: ${ACCOUNT_DB_PASSWORD:?Required}
@@ -64,6 +66,9 @@ services:
       args:
         MODULE: services/tutor-service
     environment:
+      JWT_SECRET: ${JWT_SECRET:?Required}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
+      BOOKING_SERVICE_URL: http://booking-service:8083
       DB_URL: jdbc:postgresql://postgres:5432/tutor_db
       DB_USERNAME: tutor_app
       DB_PASSWORD: ${TUTOR_DB_PASSWORD:?Required}
@@ -78,6 +83,10 @@ services:
       args:
         MODULE: services/booking-service
     environment:
+      JWT_SECRET: ${JWT_SECRET:?Required}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
+      TUTOR_SERVICE_URL: http://tutor-service:8082
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
       DB_URL: jdbc:postgresql://postgres:5432/learning_db
       DB_USERNAME: learning_app
       DB_PASSWORD: ${LEARNING_DB_PASSWORD:?Required}
@@ -92,6 +101,7 @@ services:
       args:
         MODULE: services/payment-service
     environment:
+      JWT_SECRET: ${JWT_SECRET:?Required}
       DB_URL: jdbc:postgresql://postgres:5432/payment_db
       DB_USERNAME: payment_app
       DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?Required}
@@ -106,6 +116,7 @@ services:
       args:
         MODULE: services/notification-service
     environment:
+      JWT_SECRET: ${JWT_SECRET:?Required}
       DB_URL: jdbc:postgresql://postgres:5432/notification_db
       DB_USERNAME: notification_app
       DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?Required}

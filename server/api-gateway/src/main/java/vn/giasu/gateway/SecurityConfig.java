@@ -8,8 +8,12 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 class SecurityConfig {
     @Bean
     SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
-        return http.authorizeExchange(auth -> auth
+        // Stateless JWT API: no cookies/session at the gateway, so CSRF does not apply. Services check JWT and roles.
+        return http.csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .authorizeExchange(auth -> auth
                 .pathMatchers(HttpMethod.GET, "/actuator/health", "/api/v1/identity/health", "/api/v1/tutors/health", "/api/v1/bookings/health", "/api/v1/payments/health", "/api/v1/notifications/health").permitAll()
+                .pathMatchers("/api/v1/*/internal/**").denyAll()
+                .pathMatchers("/api/v1/identity/**", "/api/v1/tutors/**", "/api/v1/bookings/**", "/api/v1/notifications/**").permitAll()
                 .anyExchange().denyAll()).build();
     }
 }

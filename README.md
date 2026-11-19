@@ -37,10 +37,12 @@ Cần Java 21, Maven 3.9+, Node.js 24 LTS (repo cũng chấp nhận Node 25). B�
 
 ```powershell
 $env:DB_PASSWORD = 'local_account_change_me' # Khớp ACCOUNT_DB_PASSWORD trong .env
+$env:JWT_SECRET = 'local_jwt_secret_change_me_min_32_bytes' # Giống nhau ở mọi service, >= 32 byte
+$env:DEMO_PASSWORD = 'Demo@12345' # Chỉ identity: tạo 5 tài khoản demo
 mvn -f server/services/identity-service/pom.xml spring-boot:run
 ```
 
-Service khác dùng đường dẫn và mật khẩu tương ứng. DB_URL, DB_USERNAME, DB_PASSWORD, SERVER_PORT có thể ghi đè qua env. Identity giữ account_db/account_app; booking giữ learning_db/learning_app để không tác động dữ liệu cũ.
+Service khác dùng đường dẫn và mật khẩu tương ứng, cùng `JWT_SECRET`. Tutor và booking thêm `$env:SPRING_PROFILES_ACTIVE = 'demo'` để nạp dữ liệu demo (Flyway `db/demo`). DB_URL, DB_USERNAME, DB_PASSWORD, SERVER_PORT có thể ghi đè qua env. Identity giữ account_db/account_app; booking giữ learning_db/learning_app để không tác động dữ liệu cũ.
 
 ```powershell
 mvn -f server/api-gateway/pom.xml spring-boot:run
@@ -55,7 +57,19 @@ npm ci
 npm run dev
 ```
 
-Web rewrite cùng origin `/api/*` tới Gateway. Gateway hiện chỉ mở health `/api/v1/{identity|tutors|bookings|payments|notifications}/health`, chặn API khác. Các trang `/`, `/learner`, `/tutor`, `/admin` là trang khung; chưa có phân quyền giao diện hoặc dữ liệu riêng.
+Web rewrite cùng origin `/api/*` tới Gateway. Gateway mở health và API nghiệp vụ identity/tutors/bookings/notifications (xem [docs/api](docs/api/README.md)), chặn `/api/v1/*/internal/**` và API payment. Các trang `/`, `/learner`, `/tutor`, `/admin` vẫn là trang khung (giao diện làm ở Task 4).
+
+## Đăng nhập demo (mock)
+
+Chưa có đăng ký/xác minh email. Khi đặt `DEMO_PASSWORD`, identity tạo 5 tài khoản dùng chung mật khẩu đó; `POST /api/v1/identity/auth/login` trả JWT thật và phân quyền chạy như bình thường.
+
+| Email | Vai trò | Dữ liệu demo (profile `demo`) |
+|---|---|---|
+| `admin@demo.giasu.vn` | ADMIN | Duyệt hồ sơ |
+| `tutor1@demo.giasu.vn` | TUTOR | Hồ sơ đã duyệt (Toán/Anh, linh hoạt), lịch rảnh T2/T4/T6/T7 08–12, T3/T5 18–22 |
+| `tutor2@demo.giasu.vn` | TUTOR | Hồ sơ chờ duyệt (Văn, online) |
+| `learner1@demo.giasu.vn` | LEARNER | Kế hoạch đã chốt với tutor1, T3/T5 18:00–20:00 |
+| `learner2@demo.giasu.vn` | LEARNER | Trống, để demo đặt lịch |
 
 ## Kiểm tra
 
@@ -66,11 +80,11 @@ npm --prefix web run typecheck
 docker compose --env-file .env.example -f infra/compose.yaml --profile app config --quiet
 ```
 
-Backend có 6 test: route HTTP Gateway và bảo vệ health/private của 5 service, không cần database. CI chạy build/test server và build/typecheck web; chưa publish hoặc deploy. Chưa thay thế kiểm thử PostgreSQL, Kafka, email hay toàn bộ Docker.
+Backend: test route Gateway, test JWT/phân quyền cho 5 service và test API identity không cần database; test Postgres (`*PostgresTest`: đăng nhập demo, hồ sơ/duyệt/tìm kiếm/nhận xét, lịch rảnh/kế hoạch/buổi học/chống trùng đồng thời) dùng Testcontainers và tự bỏ qua khi máy không có Docker. CI chạy build/test server và build/typecheck web; chưa publish hoặc deploy. Chưa thay thế kiểm thử PostgreSQL, Kafka, email hay toàn bộ Docker.
 
 ## Phạm vi và dữ liệu
 
-Module có README trong package/features/libs/mock/monitoring là vị trí thiết kế. Chưa có ERD chi tiết, API nghiệp vụ, JWT, OpenAPI/Swagger UI, thư viện form/UI, Postman/Playwright, outbox, giám sát hoặc triển khai VPS. Chỉ thêm khi triển khai chức năng tương ứng.
+Module có README trong package/features/libs/mock/monitoring là vị trí thiết kế. Chưa có ERD chi tiết, OpenAPI/Swagger UI, thư viện form/UI, Postman/Playwright, outbox, giám sát hoặc triển khai VPS. Chỉ thêm khi triển khai chức năng tương ứng.
 
 Thanh toán/hoàn/chi của đồ án chỉ mô phỏng. Không giữ tiền thật; không có LMS SSO, tuyển dụng, khoảng thiếu hụt học tập, lọc giá hoặc thuật toán xếp hạng gia sư. Không commit .env, bí mật hoặc bằng chứng riêng. Chỉ public asset nằm ở web/public.
 
