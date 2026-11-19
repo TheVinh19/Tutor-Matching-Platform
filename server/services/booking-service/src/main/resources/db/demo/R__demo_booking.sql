@@ -1,12 +1,12 @@
 -- Demo data for the mock accounts (fixed UUIDs from identity DemoAccountSeeder). Dates are relative to the first run.
--- tutor1: Mon/Wed/Fri/Sat 08:00-12:00 and Tue/Thu 18:00-22:00. learner1: confirmed plan Tue/Thu 18:00-20:00. learner2: nothing.
+-- tutor1: Mon/Wed/Fri/Sat 08:00-13:00 and Tue/Thu 17:00-22:00 (two grid cells each). learner1: confirmed plan Tue/Thu 18:00-20:00. learner2: nothing.
 INSERT INTO availability_slots (id, tutor_id, day_of_week, start_time, end_time, mode, effective_from)
 SELECT ('20000000-0000-0000-0000-00000000000' || d)::uuid, '00000000-0000-0000-0000-000000000002', d,
-       CASE WHEN d IN (2, 4) THEN time '18:00' ELSE time '08:00' END,
-       CASE WHEN d IN (2, 4) THEN time '22:00' ELSE time '12:00' END,
+       CASE WHEN d IN (2, 4) THEN time '17:00' ELSE time '08:00' END,
+       CASE WHEN d IN (2, 4) THEN time '22:00' ELSE time '13:00' END,
        'FLEX', current_date - 30
 FROM unnest(ARRAY[1, 2, 3, 4, 5, 6]) AS d
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET start_time = excluded.start_time, end_time = excluded.end_time;
 
 INSERT INTO plans (id, learner_id, tutor_id, subject_code, level_code, mode, note, status, payment_status,
                    start_date, end_date, meet_link, created_at, proposed_at, confirmed_at)

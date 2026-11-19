@@ -137,7 +137,7 @@ class SessionController {
             throw new ApiException(HttpStatus.CONFLICT, "CONFIRM_WINDOW_CLOSED", "Đã quá 24 giờ để phản đối");
         }
         jdbc.sql("UPDATE sessions SET status = 'DISPUTED', dispute_reason = ?, updated_at = now() WHERE id = ?").params(r.reason().strip(), id).update();
-        notifier.send(s.tutorId(), "SESSION_DISPUTED", "Người thuê phản đối buổi học", r.reason().strip(), "SESSION", id);
+        notifier.send(s.tutorId(), "SESSION_DISPUTED", "Học sinh phản đối buổi học", r.reason().strip(), "SESSION", id);
         return plans.session(id, false);
     }
 

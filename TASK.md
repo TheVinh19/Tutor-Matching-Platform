@@ -2,7 +2,7 @@
 
 Tuần 4–7 (26/10–22/11/2026). Nhánh: `feature/mock-dn-va-ho-so`.
 
-**Trạng thái (18/11/2026):** Task 1–3 đã có code, `mvn clean install` xanh. Test Postgres (`*PostgresTest`) chạy với Docker: tất cả pass; dữ liệu demo đã thử trên Postgres 17. Task 4–5 chưa làm.
+**Trạng thái (18/11/2026):** Task 1–3 đã có code, `mvn clean install` xanh. Test Postgres (`*PostgresTest`) chạy với Docker: tất cả pass; dữ liệu demo đã thử trên Postgres 17. Task 4 (FE) đã có code: build + typecheck xanh. Task 5 chưa làm.
 
 Nguồn: `Tai lieu/Yeu_cau_du_an_gia_su_v1.2.docx` (P01, GS01, CA01–CA05, DK, DG02), `Tai lieu/Vai_tro_va_quyen_nen_tang_gia_su_v1.2.docx`, `docs/architecture/domain-map.md`.
 

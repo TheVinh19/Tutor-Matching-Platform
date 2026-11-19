@@ -49,13 +49,19 @@ class PlanController {
     enum PlanMode { ONLINE, OFFLINE }
 
     record CreateRequest(@NotNull UUID tutorId, @NotBlank @Size(max = 32) String subjectCode, @NotBlank @Size(max = 32) String levelCode,
-                         @NotNull PlanMode mode, @Size(max = 1000) String note) {}
-    record WeeklySlot(@NotNull @Min(1) @Max(7) Integer dayOfWeek, @NotNull LocalTime startTime) {}
-    record ProposeRequest(@NotNull LocalDate startDate, LocalDate endDate,
+                         @NotNull PlanMode mode, @Size(max = 1000) String note,
+                         // Grid flow (all four or none): how often, from when, how long, and which weekly cells suit the learner.
+                         @Min(1) @Max(7) Integer sessionsPerWeek, LocalDate startDate, @Min(1) @Max(26) Integer weeks,
+                         @Size(max = 35) List<@Valid @NotNull WeeklySlot> preferredSlots) {}
+    record WeeklySlot(@NotNull @Min(1) @Max(7) Integer dayOfWeek, @NotNull LocalTime startTime) {
+        Plans.Cell cell() { return new Plans.Cell(dayOfWeek, startTime); }
+    }
+    /** startDate may be omitted when the learner already chose it (grid flow). */
+    record ProposeRequest(LocalDate startDate, LocalDate endDate,
                           @NotNull @Size(min = 1, max = 14) List<@Valid @NotNull WeeklySlot> slots,
                           @Size(max = 500) @Pattern(regexp = "https://\\S+", message = "phải là link https") String meetLink) {}
     record ReasonRequest(@NotBlank @Size(max = 1000) String reason) {}
-    record PlanDetail(Plan plan, List<Session> sessions) {}
+    record PlanDetail(Plan plan, List<Session> sessions, List<Plans.Cell> preferredSlots) {}
     record Conflict(OffsetDateTime startAt, OffsetDateTime endAt, String side) {}
     record Eligibility(UUID planId, UUID learnerId, UUID tutorId, String status, OffsetDateTime closedAt) {}
 
@@ -85,13 +91,36 @@ class PlanController {
         if (!"FLEX".equals(tutor.teachingMode()) && !tutor.teachingMode().equals(r.mode().name())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "MODE_NOT_OFFERED", "Gia sư không dạy theo hình thức này");
         }
+        boolean grid = r.preferredSlots() != null;
+        LocalDate start = r.startDate();
+        LocalDate end = null;
+        List<WeeklySlot> preferred = grid ? r.preferredSlots().stream().distinct().toList() : List.of();
+        if (grid != (r.sessionsPerWeek() != null) || grid != (start != null) || grid != (r.weeks() != null)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INCOMPLETE_PREFERENCES", "Cần chọn đủ số buổi/tuần, ngày bắt đầu, số tuần và các ca");
+        }
+        if (grid) {
+            end = start.plusWeeks(r.weeks()).minusDays(1);
+            if (!start.isAfter(Schedule.today())) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE", "Ngày bắt đầu phải từ ngày mai");
+            }
+            if (preferred.size() < r.sessionsPerWeek()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "TOO_FEW_SLOTS", "Cần chọn ít nhất " + r.sessionsPerWeek() + " ca");
+            }
+            checkInsideAvailability(r.tutorId(), r.mode().name(), preferred, start, end);
+        }
         UUID id = UUID.randomUUID();
         UUID learnerId = Plans.caller(jwt);
-        jdbc.sql("INSERT INTO plans (id, learner_id, tutor_id, subject_code, level_code, mode, note, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'REQUESTED')")
-                .params(id, learnerId, r.tutorId(), r.subjectCode(), r.levelCode(), r.mode().name(), r.note() == null ? "" : r.note().strip())
+        jdbc.sql("""
+                INSERT INTO plans (id, learner_id, tutor_id, subject_code, level_code, mode, note, status, sessions_per_week, weeks, start_date, end_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'REQUESTED', ?, ?, ?, ?)""")
+                .params(id, learnerId, r.tutorId(), r.subjectCode(), r.levelCode(), r.mode().name(), r.note() == null ? "" : r.note().strip(),
+                        r.sessionsPerWeek(), r.weeks(), start, end)
                 .update();
-        notifier.send(r.tutorId(), "PLAN_REQUESTED", "Yêu cầu học mới", "Có Người thuê gửi yêu cầu học " + r.subjectCode() + " " + r.levelCode() + ".", "PLAN", id);
-        return new PlanDetail(plans.get(id), List.of());
+        for (WeeklySlot c : preferred) {
+            jdbc.sql("INSERT INTO plan_preferred_slots (plan_id, day_of_week, start_time) VALUES (?, ?, ?)").params(id, c.dayOfWeek(), c.startTime()).update();
+        }
+        notifier.send(r.tutorId(), "PLAN_REQUESTED", "Yêu cầu học mới", "Có Học sinh gửi yêu cầu học " + r.subjectCode() + " " + r.levelCode() + ".", "PLAN", id);
+        return detailOf(id);
     }
 
     @GetMapping("/api/v1/bookings/plans/me")
@@ -106,7 +135,7 @@ class PlanController {
     PlanDetail detail(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         Plan plan = plans.get(id);
         Plans.requireParticipantOrAdmin(jwt, plan.learnerId(), plan.tutorId());
-        return new PlanDetail(plan, plans.sessionsOf(id));
+        return detailOf(id);
     }
 
     @PostMapping("/api/v1/bookings/plans/{id}/propose")
@@ -118,19 +147,37 @@ class PlanController {
         Plans.require(plan.tutorId().equals(Plans.caller(jwt)), "NOT_PLAN_TUTOR", "Không phải gia sư của kế hoạch này");
         Plans.requireStatus("REQUESTED".equals(plan.status()), "Chỉ lập kế hoạch cho yêu cầu đang chờ");
 
-        LocalDate start = r.startDate();
-        LocalDate end = r.endDate() != null ? r.endDate() : start.plusWeeks(Schedule.DEFAULT_WEEKS).minusDays(1);
+        boolean grid = plan.sessionsPerWeek() != null;
+        if (grid) {
+            List<Plans.Cell> preferred = plans.preferredSlots(id);
+            List<WeeklySlot> notPreferred = r.slots().stream().filter(s -> !preferred.contains(s.cell())).toList();
+            if (!notPreferred.isEmpty()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "NOT_PREFERRED_SLOT", "Chỉ chọn trong các ca Học sinh đã chọn", notPreferred);
+            }
+            if (r.slots().stream().distinct().count() != plan.sessionsPerWeek()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "WRONG_SLOT_COUNT", "Cần chọn đúng " + plan.sessionsPerWeek() + " ca/tuần");
+            }
+        }
+        LocalDate start = r.startDate() != null ? r.startDate() : plan.startDate();
+        if (start == null) throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE", "Cần ngày bắt đầu");
+        LocalDate end = r.endDate() != null ? r.endDate()
+                : r.startDate() == null && plan.endDate() != null ? plan.endDate() : start.plusWeeks(Schedule.DEFAULT_WEEKS).minusDays(1);
+        if (grid && r.startDate() == null && start.isBefore(Schedule.today())) start = Schedule.today(); // tutor answered late: keep the end date
         if (start.isBefore(Schedule.today()) || end.isBefore(start) || end.isAfter(start.plusWeeks(Schedule.MAX_WEEKS))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE", "Ngày bắt đầu/kết thúc không hợp lệ (tối đa 26 tuần)");
         }
         checkSlotRules(r.slots());
-        checkInsideAvailability(plan, r.slots(), start, end);
+        checkInsideAvailability(plan.tutorId(), plan.mode(), r.slots(), start, end);
 
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         List<OffsetDateTime[]> generated = generate(r.slots(), start, end);
+        if (grid) {
+            // The learner picked the start date days ago: drop sessions now too close to confirm, instead of failing the tutor.
+            generated.removeIf(s -> !now.isBefore(s[0].minus(Schedule.CUTOFF_BEFORE_FIRST)));
+        }
         if (generated.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "NO_SESSIONS", "Khoảng ngày không có buổi nào khớp các thứ đã chọn");
         }
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         OffsetDateTime cutoff = generated.get(0)[0].minus(Schedule.CUTOFF_BEFORE_FIRST);
         if (!now.isBefore(cutoff)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "FIRST_SESSION_TOO_SOON", "Buổi đầu phải cách thời điểm hiện tại hơn 12 giờ");
@@ -155,7 +202,7 @@ class PlanController {
                 .params(start, end, hold, r.meetLink(), id).update();
         notifier.send(plan.learnerId(), "PLAN_PROPOSED", "Gia sư đã gửi kế hoạch học",
                 generated.size() + " buổi, cần xác nhận trước " + hold.atZoneSameInstant(Schedule.ZONE).toLocalDateTime() + ".", "PLAN", id);
-        return new PlanDetail(plans.get(id), plans.sessionsOf(id));
+        return detailOf(id);
     }
 
     @PostMapping("/api/v1/bookings/plans/{id}/confirm")
@@ -172,8 +219,8 @@ class PlanController {
                 .params(plan.meetLink(), id).update();
         jdbc.sql("UPDATE plans SET status = 'CONFIRMED', payment_status = 'PAYMENT_PENDING_MOCK', confirmed_at = now(), updated_at = now() WHERE id = ?")
                 .param(id).update();
-        notifier.send(plan.tutorId(), "PLAN_CONFIRMED", "Người thuê đã xác nhận kế hoạch", "Lịch học đã được chốt.", "PLAN", id);
-        return new PlanDetail(plans.get(id), plans.sessionsOf(id));
+        notifier.send(plan.tutorId(), "PLAN_CONFIRMED", "Học sinh đã xác nhận kế hoạch", "Lịch học đã được chốt.", "PLAN", id);
+        return detailOf(id);
     }
 
     @PostMapping("/api/v1/bookings/plans/{id}/reject")
@@ -186,7 +233,7 @@ class PlanController {
         jdbc.sql("UPDATE plans SET status = 'REJECTED', reject_reason = ?, closed_at = now(), updated_at = now() WHERE id = ?")
                 .params(r.reason().strip(), id).update();
         notifier.send(plan.learnerId(), "PLAN_REJECTED", "Gia sư từ chối yêu cầu", r.reason().strip(), "PLAN", id);
-        return new PlanDetail(plans.get(id), List.of());
+        return detailOf(id);
     }
 
     @PostMapping("/api/v1/bookings/plans/{id}/cancel")
@@ -199,8 +246,8 @@ class PlanController {
                 "Chỉ hủy được kế hoạch chưa chốt; buổi đã chốt dùng báo bận/hủy buổi");
         jdbc.sql("UPDATE sessions SET status = 'RELEASED', updated_at = now() WHERE plan_id = ? AND status = 'HELD'").param(id).update();
         jdbc.sql("UPDATE plans SET status = 'CANCELLED', closed_at = now(), updated_at = now() WHERE id = ?").param(id).update();
-        notifier.send(plan.tutorId(), "PLAN_CANCELLED", "Người thuê đã hủy yêu cầu", "Lịch giữ (nếu có) đã được giải phóng.", "PLAN", id);
-        return new PlanDetail(plans.get(id), plans.sessionsOf(id));
+        notifier.send(plan.tutorId(), "PLAN_CANCELLED", "Học sinh đã hủy yêu cầu", "Lịch giữ (nếu có) đã được giải phóng.", "PLAN", id);
+        return detailOf(id);
     }
 
     // shortcut: latest 100 only, add paging/filters for the admin screens later.
@@ -216,6 +263,10 @@ class PlanController {
     Eligibility eligibility(@PathVariable UUID id) {
         Plan plan = plans.get(id);
         return new Eligibility(plan.id(), plan.learnerId(), plan.tutorId(), plan.status(), plan.closedAt());
+    }
+
+    private PlanDetail detailOf(UUID id) {
+        return new PlanDetail(plans.get(id), plans.sessionsOf(id), plans.preferredSlots(id));
     }
 
     static void checkSlotRules(List<WeeklySlot> slots) {
@@ -237,13 +288,13 @@ class PlanController {
         }
     }
 
-    private void checkInsideAvailability(Plan plan, List<WeeklySlot> slots, LocalDate start, LocalDate end) {
+    private void checkInsideAvailability(UUID tutorId, String mode, List<WeeklySlot> slots, LocalDate start, LocalDate end) {
         List<WeeklySlot> outside = slots.stream().filter(s -> jdbc.sql("""
                 SELECT count(*) FROM availability_slots
                 WHERE tutor_id = :tutor AND day_of_week = :day AND start_time <= :start AND end_time >= :end
                   AND mode IN (:mode, 'FLEX') AND effective_from <= :fromDate AND (effective_to IS NULL OR effective_to >= :toDate)""")
-                .param("tutor", plan.tutorId()).param("day", s.dayOfWeek()).param("start", s.startTime())
-                .param("end", s.startTime().plus(Schedule.SESSION_LENGTH)).param("mode", plan.mode())
+                .param("tutor", tutorId).param("day", s.dayOfWeek()).param("start", s.startTime())
+                .param("end", s.startTime().plus(Schedule.SESSION_LENGTH)).param("mode", mode)
                 .param("fromDate", start).param("toDate", end)
                 .query(Long.class).single() == 0).toList();
         if (!outside.isEmpty()) {

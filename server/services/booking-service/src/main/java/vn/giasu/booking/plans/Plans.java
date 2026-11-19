@@ -1,6 +1,7 @@
 package vn.giasu.booking.plans;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -17,7 +18,10 @@ public class Plans {
     public record Plan(UUID id, UUID learnerId, UUID tutorId, String subjectCode, String levelCode, String mode, String note,
                        String status, String paymentStatus, String rejectReason, LocalDate startDate, LocalDate endDate,
                        OffsetDateTime holdExpiresAt, String meetLink, OffsetDateTime createdAt, OffsetDateTime proposedAt,
-                       OffsetDateTime confirmedAt, OffsetDateTime closedAt) {}
+                       OffsetDateTime confirmedAt, OffsetDateTime closedAt, Integer sessionsPerWeek, Integer weeks) {}
+
+    /** One weekly grid cell (weekday + start of a 120-minute session). */
+    public record Cell(int dayOfWeek, LocalTime startTime) {}
 
     public record Session(UUID id, UUID planId, UUID tutorId, UUID learnerId, OffsetDateTime startAt, OffsetDateTime endAt,
                           String status, String meetLink, String cancelReason, UUID cancelledBy, OffsetDateTime cancelledAt,
@@ -26,7 +30,8 @@ public class Plans {
 
     public static final String PLAN_SELECT = """
             SELECT id, learner_id, tutor_id, subject_code, level_code, mode, note, status, payment_status, reject_reason,
-                   start_date, end_date, hold_expires_at, meet_link, created_at, proposed_at, confirmed_at, closed_at FROM plans""";
+                   start_date, end_date, hold_expires_at, meet_link, created_at, proposed_at, confirmed_at, closed_at,
+                   sessions_per_week, weeks FROM plans""";
     public static final String SESSION_SELECT = """
             SELECT id, plan_id, tutor_id, learner_id, start_at, end_at, status, meet_link, cancel_reason, cancelled_by, cancelled_at,
                    completed_at, confirm_deadline, confirmed_at, auto_confirmed, dispute_reason FROM sessions""";
@@ -48,6 +53,11 @@ public class Plans {
     public Plan getForUpdate(UUID id) {
         return jdbc.sql(PLAN_SELECT + " WHERE id = ? FOR UPDATE").param(id).query(Plan.class).optional()
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PLAN_NOT_FOUND", "Không tìm thấy kế hoạch"));
+    }
+
+    public List<Cell> preferredSlots(UUID planId) {
+        return jdbc.sql("SELECT day_of_week, start_time FROM plan_preferred_slots WHERE plan_id = ? ORDER BY day_of_week, start_time")
+                .param(planId).query(Cell.class).list();
     }
 
     public List<Session> sessionsOf(UUID planId) {

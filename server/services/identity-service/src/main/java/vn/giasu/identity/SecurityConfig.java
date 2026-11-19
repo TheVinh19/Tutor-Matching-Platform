@@ -13,7 +13,7 @@ class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return ApiSecurity.stateless(http).authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/v1/identity/auth/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/identity/auth/login", "/api/v1/identity/auth/register").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().denyAll()).build();
     }

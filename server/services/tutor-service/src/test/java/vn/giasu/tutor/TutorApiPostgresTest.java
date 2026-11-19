@@ -158,9 +158,11 @@ class TutorApiPostgresTest {
                 .andExpect(jsonPath("$.details[0]").value("XYZ"));
         call(put("/api/v1/tutors/me/profile"), tutor, "TUTOR", profileJson("OFFLINE", "{\"subjectCode\":\"LY\",\"levelCode\":\"THPT\"}", ""))
                 .andExpect(status().isOk());
+        call(put("/api/v1/tutors/me/profile"), tutor, "TUTOR", profileJson("OFFLINE", "", ""))
+                .andExpect(status().isOk());
         call(post("/api/v1/tutors/me/profile/submit"), tutor, "TUTOR", null)
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("PROFILE_INCOMPLETE"));
-        call(put("/api/v1/tutors/me/profile"), tutor, "TUTOR", profileJson("OFFLINE", "{\"subjectCode\":\"LY\",\"levelCode\":\"THPT\"}", "\"HCM-Q1\""))
+        call(put("/api/v1/tutors/me/profile"), tutor, "TUTOR", profileJson("OFFLINE", "{\"subjectCode\":\"LY\",\"levelCode\":\"THPT\"}", ""))
                 .andExpect(status().isOk());
         call(post("/api/v1/tutors/me/profile/submit"), tutor, "TUTOR", null).andExpect(status().isOk());
         call(post("/api/v1/tutors/admin/profiles/" + tutor + "/reject"), admin, "ADMIN", "{\"reason\":\"\"}")

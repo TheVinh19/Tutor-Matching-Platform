@@ -37,9 +37,23 @@ class DemoAccountsPostgresTest {
             {"learner1@demo.giasu.vn", "LEARNER"}, {"learner2@demo.giasu.vn", "LEARNER"}};
         for (String[] account : expected) {
             mvc.perform(post("/api/v1/identity/auth/login").contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"email\":\"" + account[0] + "\",\"password\":\"Demo-pass-123\"}"))
+                            .content("{\"login\":\"" + account[0] + "\",\"password\":\"Demo-pass-123\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.role").value(account[1]));
         }
+    }
+
+    @Test
+    void registerWithUsernameThenLogInAndDuplicateIsRejected() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(context)
+                .addFilters(context.getBean("springSecurityFilterChain", jakarta.servlet.Filter.class)).build();
+        String body = "{\"username\":\"HocSinh.An\",\"password\":\"matkhau123\",\"role\":\"LEARNER\"}";
+        mvc.perform(post("/api/v1/identity/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.role").value("LEARNER"));
+        mvc.perform(post("/api/v1/identity/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("USERNAME_TAKEN"));
+        mvc.perform(post("/api/v1/identity/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"login\":\"hocsinh.an\",\"password\":\"matkhau123\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.role").value("LEARNER"));
     }
 }

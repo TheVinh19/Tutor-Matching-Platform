@@ -13,7 +13,7 @@ class SecurityConfig {
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/api/v1/bookings/internal/**").hasRole("SERVICE")
                 // Public: a tutor's weekly availability, shown on the public profile.
-                .requestMatchers(HttpMethod.GET, "/api/v1/bookings/availability/tutors/*").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/bookings/availability/tutors/*", "/api/v1/bookings/availability/tutors/*/free").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().denyAll()).build();
     }

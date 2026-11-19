@@ -18,6 +18,7 @@ public class Account {
     @Id
     private UUID id;
     private String email;
+    private String username;
     private String passwordHash;
     @Enumerated(EnumType.STRING)
     private Role role;
@@ -36,8 +37,18 @@ public class Account {
         this.status = Status.ACTIVE;
     }
 
+    /** Self sign-up: username only, email/phone are linked later. */
+    public static Account withUsername(UUID id, String username, String passwordHash, Role role) {
+        Account account = new Account(id, null, passwordHash, role);
+        account.username = username;
+        return account;
+    }
+
     public UUID getId() { return id; }
     public String getEmail() { return email; }
+    public String getUsername() { return username; }
+    /** What to show and put in the token: username if set, else email. */
+    public String getLoginName() { return username != null ? username : email; }
     public String getPasswordHash() { return passwordHash; }
     public Role getRole() { return role; }
     public Status getStatus() { return status; }

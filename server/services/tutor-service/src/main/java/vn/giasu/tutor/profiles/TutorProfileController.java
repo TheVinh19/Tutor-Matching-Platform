@@ -79,9 +79,8 @@ class TutorProfileController {
     Profile submit(@AuthenticationPrincipal Jwt jwt) {
         UUID accountId = id(jwt);
         Profile profile = myProfile(jwt);
-        if (profile.subjects().isEmpty() || (profile.teachingMode() != Mode.ONLINE && profile.areaCodes().isEmpty())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "PROFILE_INCOMPLETE",
-                    "Cần ít nhất một môn/cấp học, và địa bàn nếu dạy trực tiếp hoặc linh hoạt");
+        if (profile.subjects().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PROFILE_INCOMPLETE", "Cần chọn ít nhất một môn/cấp học");
         }
         if (!store.transition(accountId, List.of(Status.DRAFT, Status.REJECTED), Status.PENDING, accountId, null)) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS", "Hồ sơ không ở trạng thái nháp hoặc bị từ chối");
