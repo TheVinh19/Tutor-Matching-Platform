@@ -49,11 +49,13 @@ const minuteAt = (clientY: number, column: Element) => {
  * - zones: open areas (free time / options); with zones, everything else is shown greyed out
  * - blocks: chosen ranges (solid), clickable via onBlockClick
  * - locked: booked sessions drawn on top, read-only
+ * disabledDays: weekdays (1-7) shown greyed with no interaction, e.g. dates already past.
+ * pastUntil: on that weekday, time before `minute` is greyed and drawing starts no earlier (today's elapsed hours).
  * - preview: dashed ghost while drawing (draw) or hovering where place() would put a block
  * draw: press-drag on empty space to create a range. place: click inside a zone; place(day, minute) decides the block or null.
  */
-export function TimeGrid({ label, zones, blocks = [], locked = [], draw, place, onPlace, onBlockClick, blockHint }: {
-  label: string; zones?: Block[]; blocks?: Block[]; locked?: Block[];
+export function TimeGrid({ label, zones, blocks = [], locked = [], disabledDays = [], pastUntil, draw, place, onPlace, onBlockClick, blockHint }: {
+  label: string; zones?: Block[]; blocks?: Block[]; locked?: Block[]; disabledDays?: number[]; pastUntil?: { dayOfWeek: number; minute: number };
   draw?: (b: Block) => void;
   place?: (day: number, minute: number) => Block | null; onPlace?: (b: Block) => void;
   onBlockClick?: (b: Block) => void; blockHint?: string;
@@ -62,9 +64,10 @@ export function TimeGrid({ label, zones, blocks = [], locked = [], draw, place, 
   const [drag, setDrag] = useState<{ day: number; anchor: number; m: number } | null>(null);
   const dragBlock = drag && fitWindow(drag.day, Math.min(drag.anchor, drag.m), Math.max(drag.anchor, drag.m) + STEP);
   const preview = dragBlock ?? ghost;
+  const floor = (d: number) => (pastUntil?.dayOfWeek === d ? pastUntil.minute : DAY_START);
 
   const onMove = (d: number) => (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (drag) setDrag({ ...drag, m: minuteAt(e.clientY, e.currentTarget) });
+    if (drag) setDrag({ ...drag, m: Math.max(floor(drag.day), minuteAt(e.clientY, e.currentTarget)) });
     else if (place) setGhost(place(d, minuteAt(e.clientY, e.currentTarget)));
   };
 
@@ -72,25 +75,31 @@ export function TimeGrid({ label, zones, blocks = [], locked = [], draw, place, 
     <div className="overflow-x-auto">
       <div role="group" aria-label={label} className="grid min-w-[520px] grid-cols-[2.75rem_repeat(7,minmax(0,1fr))] gap-x-1 select-none">
         <div />
-        {DAYS.map((d) => <div key={d} className="pb-1 text-center text-xs font-medium text-muted-foreground">{shortDay(d)}</div>)}
+        {DAYS.map((d) => <div key={d} className={cn("pb-1 text-center text-xs font-medium text-muted-foreground", disabledDays.includes(d) && "opacity-40")}>{shortDay(d)}</div>)}
         <div className="relative" style={{ height: HEIGHT }}>
           {HOURS.map((h) => (
             <span key={h} className="absolute right-1 -translate-y-1/2 text-[11px] text-muted-foreground" style={{ top: (h * 60 - DAY_START) / STEP * ROW }}>{h}:00</span>
           ))}
         </div>
-        {DAYS.map((d) => (
+        {DAYS.map((d) => disabledDays.includes(d) ? (
+          <div key={d} aria-disabled title="Ngày đã qua" className="cursor-not-allowed rounded-md border bg-muted opacity-40" style={{ height: HEIGHT }} />
+        ) : (
           <div key={d}
             className={cn("relative rounded-md border", zones ? "bg-muted/60" : "bg-background", draw && "cursor-crosshair touch-none")}
             style={{ height: HEIGHT, backgroundImage: "linear-gradient(to bottom, var(--color-border) 1px, transparent 1px)", backgroundSize: `100% ${ROW * 2}px` }}
             onPointerDown={draw ? (e) => {
               if (e.button !== 0) return;
               e.currentTarget.setPointerCapture(e.pointerId);
-              const m = minuteAt(e.clientY, e.currentTarget);
+              const m = Math.max(floor(d), minuteAt(e.clientY, e.currentTarget));
               setDrag({ day: d, anchor: m, m });
             } : undefined}
             onPointerMove={onMove(d)}
             onPointerUp={() => { if (dragBlock) draw?.(dragBlock); setDrag(null); }}
             onPointerLeave={() => setGhost(null)}>
+            {floor(d) > DAY_START && (
+              <div aria-hidden title="Đã qua" className="absolute inset-x-0 top-0 z-[16] rounded-t-md bg-muted opacity-80"
+                style={{ height: ((floor(d) - DAY_START) / STEP) * ROW }} />
+            )}
             {zones?.filter((z) => z.dayOfWeek === d).map((z) => (
               <button key={z.startTime} type="button" disabled={!place} tabIndex={place ? 0 : -1}
                 aria-label={`${DAY_LABEL[d]} ${z.startTime}–${z.endTime}, còn trống`}

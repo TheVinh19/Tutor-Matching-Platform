@@ -2,17 +2,40 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Empty, ErrorBox, ReasonAction, useAction } from "@/components/common";
-import { addDays, addWindow, block, isoToday, norm, SESSION, TimeGrid, toMin, type Block } from "@/components/time-grid";
+import { addDays, addWindow, block, DAY_END, DAY_START, isoToday, norm, SESSION, STEP, TimeGrid, toMin, type Block } from "@/components/time-grid";
 import { DAY_LABEL } from "@/config/labels";
 import { useLoad } from "@/hooks/use-load";
 import { api, fmtDate } from "@/lib/api";
 import type { Session, WeekWindow } from "@/types/api";
 
 const mondayOf = (iso: string) => addDays(iso, -((new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7));
-const MAX_OFFER_DAYS = 56; // booking-service RescheduleController.MAX_OFFER_DAYS
+/**
+ * What is already past in the week starting `week` (a Monday), Vietnam time: earlier dates are disabled; today keeps only
+ * the time from now (rounded up to the grid step), or is disabled too once a 2h session no longer fits before 22:00.
+ */
+function pastLimits(week: string) {
+  const today = isoToday();
+  const vn = new Date(Date.now() + 7 * 3600_000);
+  const minute = Math.ceil((vn.getUTCHours() * 60 + vn.getUTCMinutes()) / STEP) * STEP;
+  const day = vn.getUTCDay() || 7;
+  const todayInWeek = addDays(week, day - 1) === today;
+  const tooLate = minute > DAY_END - SESSION;
+  return {
+    disabledDays: [1, 2, 3, 4, 5, 6, 7].filter((d) => addDays(week, d - 1) < today || (todayInWeek && tooLate && d === day)),
+    pastUntil: todayInWeek && !tooLate && minute > DAY_START ? { dayOfWeek: day, minute } : undefined,
+  };
+}
+
+function WeekNav({ week, prevDisabled, nextDisabled, onGo }: { week: string; prevDisabled: boolean; nextDisabled?: boolean; onGo: (days: number) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Button type="button" size="icon" variant="outline" aria-label="Tuần trước" disabled={prevDisabled} onClick={() => onGo(-7)}><ChevronLeft /></Button>
+      <span className="text-sm font-medium">{fmtDate(week)} – {fmtDate(addDays(week, 6))}</span>
+      <Button type="button" size="icon" variant="outline" aria-label="Tuần sau" disabled={nextDisabled} onClick={() => onGo(7)}><ChevronRight /></Button>
+    </div>
+  );
+}
 
 /**
  * One Monday-Sunday week of slots the caller may pick for a CANCEL_REPORTED session (the server drops past and blocked time).
@@ -37,13 +60,9 @@ function PickWeek({ session: s, minDate, maxDate, onDone }: { session: Session; 
 
   return (
     <div className="grid gap-2">
-      <div className="flex items-center gap-2">
-        <Button size="icon" variant="outline" aria-label="Tuần trước" disabled={week <= mondayOf(minDate)} onClick={() => go(-7)}><ChevronLeft /></Button>
-        <span className="text-sm font-medium">{fmtDate(week)} – {fmtDate(addDays(week, 6))}</span>
-        <Button size="icon" variant="outline" aria-label="Tuần sau" disabled={!!maxDate && addDays(week, 7) > maxDate} onClick={() => go(7)}><ChevronRight /></Button>
-      </div>
+      <WeekNav week={week} prevDisabled={week <= mondayOf(minDate)} nextDisabled={!!maxDate && addDays(week, 7) > maxDate} onGo={go} />
       {data?.length === 0 ? <Empty>Không còn ca trống trong tuần này.</Empty> : (
-        <TimeGrid label="Ca có thể chọn" zones={free} blocks={picked ? [picked] : []} place={place} onPlace={setPicked}
+        <TimeGrid label="Ca có thể chọn" zones={free} {...pastLimits(week)} blocks={picked ? [picked] : []} place={place} onPlace={setPicked}
           onBlockClick={() => setPicked(null)} blockHint="bấm để bỏ" />
       )}
       <ErrorBox error={error} />
@@ -57,35 +76,32 @@ function PickWeek({ session: s, minDate, maxDate, onDone }: { session: Session; 
   );
 }
 
-/** Learner draws the weekly windows they can attend and the date range, for the tutor to pick from. */
+/** Learner picks one Monday-Sunday week and draws the hours they can attend in it, for the tutor to pick one slot from. */
 function OfferForm({ session: s, onDone }: { session: Session; onDone: () => void }) {
   const today = isoToday();
-  const [from, setFrom] = useState(today);
-  const [to, setTo] = useState(addDays(today, 13));
+  const [week, setWeek] = useState(mondayOf(today));
   const [windows, setWindows] = useState<Block[]>([]);
   const { pending, error, run } = useAction();
-  const validRange = from >= today && to >= from && to <= addDays(from, MAX_OFFER_DAYS);
+  const go = (days: number) => { setWeek(addDays(week, days)); setWindows([]); };
 
   return (
     <form className="grid gap-3" onSubmit={(e) => {
       e.preventDefault();
-      void run(async () => { await api(`/v1/bookings/sessions/${s.id}/reschedule/offer`, { method: "POST", body: { fromDate: from, toDate: to, windows } }); onDone(); });
+      const fromDate = week < today ? today : week;
+      void run(async () => {
+        await api(`/v1/bookings/sessions/${s.id}/reschedule/offer`, { method: "POST", body: { fromDate, toDate: addDays(week, 6), windows } });
+        onDone();
+      });
     }}>
-      <div className="flex flex-wrap gap-3">
-        <div className="grid gap-1.5">
-          <Label htmlFor={`offer-from-${s.id}`}>Từ ngày</Label>
-          <Input id={`offer-from-${s.id}`} type="date" required min={today} value={from} onChange={(e) => setFrom(e.target.value)} />
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor={`offer-to-${s.id}`}>Đến ngày</Label>
-          <Input id={`offer-to-${s.id}`} type="date" required min={from} max={addDays(from, MAX_OFFER_DAYS)} value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-      </div>
-      <p className="text-sm">Nhấn giữ và kéo để tô giờ bạn học được (ít nhất 2 tiếng), bấm vào khoảng để xóa. Áp dụng cho mọi tuần trong khoảng ngày trên.</p>
-      <TimeGrid label="Giờ bạn có thể học" blocks={windows} draw={(w) => setWindows(addWindow(windows, w))}
+      <WeekNav week={week} prevDisabled={week <= mondayOf(today)} onGo={go} />
+      <p className="text-sm">Nhấn giữ và kéo để tô giờ bạn học được trong tuần này (ít nhất 2 tiếng), bấm vào khoảng để xóa.</p>
+      <TimeGrid label="Giờ bạn có thể học" blocks={windows} {...pastLimits(week)} draw={(w) => setWindows(addWindow(windows, w))}
         onBlockClick={(w) => setWindows(windows.filter((x) => x !== w))} blockHint="bấm để xóa" />
       <ErrorBox error={error} />
-      <Button size="sm" type="submit" className="w-fit" disabled={!windows.length || !validRange || pending}>Gửi cho gia sư</Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" type="submit" className="w-fit" disabled={!windows.length || pending}>{pending ? "Đang gửi…" : "Gửi cho gia sư"}</Button>
+        {!windows.length && <span className="text-xs font-medium text-primary">Tô ít nhất 1 khoảng giờ trên lịch để gửi.</span>}
+      </div>
     </form>
   );
 }
@@ -96,6 +112,7 @@ function OfferForm({ session: s, onDone }: { session: Session; onDone: () => voi
  */
 export function RescheduleBox({ session: s, role, onDone }: { session: Session; role: "LEARNER" | "TUTOR"; onDone: () => void }) {
   const [tab, setTab] = useState<"pick" | "offer" | null>(null);
+  const [sent, setSent] = useState(false);
   const { error, run } = useAction();
   const today = isoToday();
 
@@ -115,18 +132,20 @@ export function RescheduleBox({ session: s, role, onDone }: { session: Session; 
   return (
     <div className="grid gap-2">
       {s.offerFrom && (
-        <p className="text-sm">Đã gửi lịch có thể học {fmtDate(s.offerFrom)} – {fmtDate(s.offerTo)}, chờ gia sư chọn ca. Gửi lại sẽ thay lịch cũ.</p>
+        <p role="status" className={sent ? "rounded-md border border-primary/40 bg-accent/60 p-2 text-sm font-medium" : "text-sm"}>
+          {sent ? "✓ Đã gửi cho gia sư. " : ""}Lịch có thể học {fmtDate(s.offerFrom)} – {fmtDate(s.offerTo)} đang chờ gia sư chọn ca. Gửi lại sẽ thay lịch cũ.
+        </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant={tab === "pick" ? "default" : "outline"} aria-pressed={tab === "pick"} onClick={() => setTab(tab === "pick" ? null : "pick")}>
+        <Button size="sm" variant={tab === "pick" ? "default" : "outline"} aria-pressed={tab === "pick"} onClick={() => { setTab(tab === "pick" ? null : "pick"); setSent(false); }}>
           Chọn ca trống của gia sư
         </Button>
-        <Button size="sm" variant={tab === "offer" ? "default" : "outline"} aria-pressed={tab === "offer"} onClick={() => setTab(tab === "offer" ? null : "offer")}>
+        <Button size="sm" variant={tab === "offer" ? "default" : "outline"} aria-pressed={tab === "offer"} onClick={() => { setTab(tab === "offer" ? null : "offer"); setSent(false); }}>
           {s.offerFrom ? "Gửi lại lịch có thể học" : "Không có ca phù hợp? Gửi lịch có thể học"}
         </Button>
       </div>
       {tab === "pick" && <PickWeek session={s} minDate={today} onDone={onDone} />}
-      {tab === "offer" && <OfferForm session={s} onDone={onDone} />}
+      {tab === "offer" && <OfferForm session={s} onDone={() => { setTab(null); setSent(true); onDone(); }} />}
     </div>
   );
 }
