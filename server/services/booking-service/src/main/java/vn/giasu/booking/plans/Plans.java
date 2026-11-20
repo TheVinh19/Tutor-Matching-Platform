@@ -26,7 +26,7 @@ public class Plans {
     public record Session(UUID id, UUID planId, UUID tutorId, UUID learnerId, OffsetDateTime startAt, OffsetDateTime endAt,
                           String status, String meetLink, String cancelReason, UUID cancelledBy, OffsetDateTime cancelledAt,
                           OffsetDateTime completedAt, OffsetDateTime confirmDeadline, OffsetDateTime confirmedAt,
-                          boolean autoConfirmed, String disputeReason) {}
+                          boolean autoConfirmed, String disputeReason, LocalDate offerFrom, LocalDate offerTo) {}
 
     public static final String PLAN_SELECT = """
             SELECT id, learner_id, tutor_id, subject_code, level_code, mode, note, status, payment_status, reject_reason,
@@ -34,7 +34,7 @@ public class Plans {
                    sessions_per_week, weeks FROM plans""";
     public static final String SESSION_SELECT = """
             SELECT id, plan_id, tutor_id, learner_id, start_at, end_at, status, meet_link, cancel_reason, cancelled_by, cancelled_at,
-                   completed_at, confirm_deadline, confirmed_at, auto_confirmed, dispute_reason FROM sessions""";
+                   completed_at, confirm_deadline, confirmed_at, auto_confirmed, dispute_reason, offer_from, offer_to FROM sessions""";
 
     private final JdbcClient jdbc;
     private final Notifier notifier;

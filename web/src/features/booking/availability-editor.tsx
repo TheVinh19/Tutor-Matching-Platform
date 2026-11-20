@@ -3,22 +3,10 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ErrorBox, PageTitle, useAction } from "@/components/common";
-import { block, describeBlocks, norm, TimeGrid, toMin, type Block } from "@/components/time-grid";
+import { addWindow, describeBlocks, norm, TimeGrid, toMin, type Block } from "@/components/time-grid";
 import { useLoad } from "@/hooks/use-load";
 import { api } from "@/lib/api";
 import type { Slot } from "@/types/api";
-
-/** Adds a window, merging it with windows of the same day it touches or overlaps. */
-function addWindow(windows: Block[], w: Block) {
-  let from = toMin(w.startTime);
-  let to = toMin(w.endTime);
-  const rest = windows.filter((x) => {
-    const touches = x.dayOfWeek === w.dayOfWeek && toMin(x.startTime) <= to && from <= toMin(x.endTime);
-    if (touches) { from = Math.min(from, toMin(x.startTime)); to = Math.max(to, toMin(x.endTime)); }
-    return !touches;
-  });
-  return [...rest, block(w.dayOfWeek, from, to)];
-}
 
 /**
  * Tutor drags on the calendar to mark free time (at least 2h, any length inside 08:00-22:00) and saves once.

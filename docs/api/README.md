@@ -59,7 +59,11 @@ Mọi API đi qua gateway `:8080` (hoặc Nginx `:8088`), prefix `/api/v1/<khu>`
 | GET | `/api/v1/bookings/sessions/me?from=&to=` | LEARNER/TUTOR | mặc định −7 đến +60 ngày |
 | GET | `/api/v1/bookings/sessions/{id}` | 2 bên hoặc ADMIN | |
 | PUT | `/api/v1/bookings/sessions/{id}/meet-link` | TUTOR | `{meetLink}` https, chỉ đổi buổi đó, báo Người thuê |
-| POST | `/api/v1/bookings/sessions/{id}/cancel` | 2 bên | `{reason}`; SCHEDULED → CANCEL_REPORTED, chờ admin xử lý |
+| POST | `/api/v1/bookings/sessions/{id}/cancel` | 2 bên | `{reason}`; SCHEDULED → CANCEL_REPORTED, chờ dời lịch |
+| GET | `/api/v1/bookings/sessions/{id}/reschedule/free?fromDate=` | 2 bên | Ca chọn được trong 7 ngày từ `fromDate` (CANCEL_REPORTED). Học viên: giờ trống của gia sư. Gia sư: trong lịch học viên gửi |
+| POST | `/api/v1/bookings/sessions/{id}/reschedule` | 2 bên | `{startAt}` phải nằm trong danh sách trên; buổi → SCHEDULED giờ mới; 409 `SLOT_NOT_AVAILABLE`/`SCHEDULE_CONFLICT` |
+| POST | `/api/v1/bookings/sessions/{id}/reschedule/offer` | Học viên | `{fromDate, toDate, windows[]}` (tối đa 56 ngày); thay lịch đã gửi trước đó |
+| POST | `/api/v1/bookings/sessions/{id}/reschedule/decline` | Gia sư | `{reason}`; xóa lịch học viên gửi, báo học viên |
 | POST | `/api/v1/bookings/sessions/{id}/complete` | TUTOR | sau giờ bắt đầu → COMPLETED_PENDING_CONFIRM, hạn xác nhận 24h |
 | POST | `/api/v1/bookings/sessions/{id}/confirm` | LEARNER chủ đơn | → CONFIRMED; mọi buổi CONFIRMED thì kỳ COMPLETED |
 | POST | `/api/v1/bookings/sessions/{id}/dispute` | LEARNER chủ đơn | `{reason}` trong 24h → DISPUTED |

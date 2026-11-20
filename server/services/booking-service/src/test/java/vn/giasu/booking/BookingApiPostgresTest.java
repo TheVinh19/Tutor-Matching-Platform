@@ -302,6 +302,68 @@ class BookingApiPostgresTest {
     }
 
     @Test
+    void cancelReportedSessionIsRescheduled() throws Exception {
+        UUID tutor = UUID.randomUUID();
+        UUID learner = UUID.randomUUID();
+        openMondayMorning(tutor);
+        call(post("/api/v1/bookings/availability"), tutor, "TUTOR", """
+                {"dayOfWeek":2,"startTime":"14:00","endTime":"18:00","mode":"FLEX","effectiveFrom":"%s"}""".formatted(Schedule.today()))
+                .andExpect(status().isCreated());
+        UUID plan = requestPlan(learner, tutor);
+        propose(tutor, plan, "08:00").andExpect(status().isOk());
+        call(post("/api/v1/bookings/plans/" + plan + "/confirm"), learner, "LEARNER", null).andExpect(status().isOk());
+        List<UUID> sessions = jdbc.sql("SELECT id FROM sessions WHERE plan_id = ? ORDER BY start_at").param(plan).query(UUID.class).list();
+        UUID first = sessions.get(0);
+        UUID second = sessions.get(1);
+        String week1 = monday.toString();
+        String week2 = monday.plusWeeks(1).toString();
+
+        call(post("/api/v1/bookings/sessions/" + first + "/reschedule"), learner, "LEARNER", "{\"startAt\":\"" + monday.plusDays(1) + "T14:00:00+07:00\"}")
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INVALID_STATUS")); // not reported yet
+        call(post("/api/v1/bookings/sessions/" + first + "/cancel"), tutor, "TUTOR", "{\"reason\":\"Bận họp\"}").andExpect(status().isOk());
+
+        // Learner picks from the tutor's free time: Monday is blocked (own plan sessions + gap), Tuesday 14-18 is open.
+        call(get("/api/v1/bookings/sessions/" + first + "/reschedule/free?fromDate=" + week1), learner, "LEARNER", null)
+                .andExpect(jsonPath("$", hasSize(1))).andExpect(jsonPath("$[0].dayOfWeek").value(2)).andExpect(jsonPath("$[0].startTime").value("14:00:00"));
+        call(post("/api/v1/bookings/sessions/" + first + "/reschedule"), learner, "LEARNER", "{\"startAt\":\"" + monday.plusDays(1) + "T09:00:00+07:00\"}")
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("SLOT_NOT_AVAILABLE"));
+        call(post("/api/v1/bookings/sessions/" + first + "/reschedule"), learner, "LEARNER", "{\"startAt\":\"" + monday.plusDays(1) + "T15:00:00+07:00\"}")
+                .andExpect(jsonPath("$.status").value("SCHEDULED")).andExpect(jsonPath("$.cancelReason").value(org.hamcrest.Matchers.nullValue()));
+        verify(notifier).send(eq(tutor), eq("SESSION_RESCHEDULED"), anyString(), anyString(), eq("SESSION"), eq(first));
+
+        // Learner sends Wednesday evening of week 2; tutor picks inside it, outside their public availability.
+        call(post("/api/v1/bookings/sessions/" + second + "/cancel"), learner, "LEARNER", "{\"reason\":\"Ốm\"}").andExpect(status().isOk());
+        call(get("/api/v1/bookings/sessions/" + second + "/reschedule/free?fromDate=" + week2), tutor, "TUTOR", null).andExpect(jsonPath("$", hasSize(0)));
+        String offer = """
+                {"fromDate":"%s","toDate":"%s","windows":[{"dayOfWeek":3,"startTime":"18:00","endTime":"22:00"}]}""";
+        call(post("/api/v1/bookings/sessions/" + second + "/reschedule/offer"), tutor, "TUTOR", offer.formatted(week2, monday.plusDays(13)))
+                .andExpect(status().isForbidden());
+        call(post("/api/v1/bookings/sessions/" + second + "/reschedule/offer"), learner, "LEARNER", offer.formatted(week2, monday.plusDays(100)))
+                .andExpect(status().isBadRequest());
+        call(post("/api/v1/bookings/sessions/" + second + "/reschedule/offer"), learner, "LEARNER", offer.formatted(week2, monday.plusDays(13)))
+                .andExpect(jsonPath("$.offerFrom").value(week2));
+        verify(notifier).send(eq(tutor), eq("SESSION_RESCHEDULE_OFFER"), anyString(), anyString(), eq("SESSION"), eq(second));
+        call(get("/api/v1/bookings/sessions/" + second + "/reschedule/free?fromDate=" + week1), tutor, "TUTOR", null).andExpect(jsonPath("$", hasSize(0)));
+        call(get("/api/v1/bookings/sessions/" + second + "/reschedule/free?fromDate=" + week2), tutor, "TUTOR", null)
+                .andExpect(jsonPath("$", hasSize(1))).andExpect(jsonPath("$[0].dayOfWeek").value(3));
+        call(post("/api/v1/bookings/sessions/" + second + "/reschedule"), tutor, "TUTOR", "{\"startAt\":\"" + monday.plusDays(9) + "T19:00:00+07:00\"}")
+                .andExpect(jsonPath("$.status").value("SCHEDULED")).andExpect(jsonPath("$.offerFrom").value(org.hamcrest.Matchers.nullValue()));
+        assertEquals(monday.plusDays(9).atTime(19, 0).atZone(Schedule.ZONE).toInstant(),
+                jdbc.sql("SELECT start_at FROM sessions WHERE id = ?").param(second).query(java.time.OffsetDateTime.class).single().toInstant());
+        assertEquals(0L, jdbc.sql("SELECT count(*) FROM session_offer_windows").query(Long.class).single());
+
+        // Decline clears the offer and tells the learner.
+        UUID third = sessions.get(2);
+        call(post("/api/v1/bookings/sessions/" + third + "/cancel"), learner, "LEARNER", "{\"reason\":\"Thi\"}").andExpect(status().isOk());
+        call(post("/api/v1/bookings/sessions/" + third + "/reschedule/decline"), tutor, "TUTOR", "{\"reason\":\"Kín\"}").andExpect(status().isConflict());
+        call(post("/api/v1/bookings/sessions/" + third + "/reschedule/offer"), learner, "LEARNER", offer.formatted(week2, monday.plusDays(13)))
+                .andExpect(status().isOk());
+        call(post("/api/v1/bookings/sessions/" + third + "/reschedule/decline"), tutor, "TUTOR", "{\"reason\":\"Kín\"}")
+                .andExpect(jsonPath("$.offerFrom").value(org.hamcrest.Matchers.nullValue()));
+        verify(notifier).send(eq(learner), eq("SESSION_RESCHEDULE_DECLINED"), anyString(), eq("Kín"), eq("SESSION"), eq(third));
+    }
+
+    @Test
     void expiredHoldIsReleasedAndSlotReusable() throws Exception {
         UUID tutor = UUID.randomUUID();
         UUID learner = UUID.randomUUID();
@@ -335,6 +397,7 @@ class BookingApiPostgresTest {
         call(post("/api/v1/bookings/sessions/" + session + "/cancel"), learner, "LEARNER", "{\"reason\":\"Con bị ốm\"}")
                 .andExpect(jsonPath("$.status").value("CANCEL_REPORTED")).andExpect(jsonPath("$.cancelledBy").value(learner.toString()));
         verify(notifier).send(eq(tutor), eq("SESSION_CANCEL_REPORTED"), anyString(), anyString(), eq("SESSION"), eq(session));
+
         call(get("/api/v1/bookings/sessions/me"), learner, "LEARNER", null).andExpect(status().isOk());
         call(get("/api/v1/bookings/plans/me"), tutor, "TUTOR", null).andExpect(jsonPath("$[*].id", hasItem(plan.toString())));
 

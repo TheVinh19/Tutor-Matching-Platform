@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ErrorBox, ReasonAction, StatusBadge, useAction } from "@/components/common";
 import { SESSION_STATUS } from "@/config/labels";
 import { api, fmtClock, fmtDateTime } from "@/lib/api";
+import { RescheduleBox } from "@/features/booking/reschedule-box";
 import type { Session } from "@/types/api";
 
 type Role = "LEARNER" | "TUTOR";
@@ -60,6 +61,7 @@ export function SessionCard({ session: s, role, onChange }: { session: Session; 
           <Button size="sm" variant="ghost" onClick={() => setEditLink(true)}>Đổi link học</Button>
         )}
       </div>
+      {s.status === "CANCEL_REPORTED" && <RescheduleBox session={s} role={role} onDone={onChange} />}
       {editLink && (
         <form className="flex flex-wrap gap-2" onSubmit={async (e) => {
           e.preventDefault();
