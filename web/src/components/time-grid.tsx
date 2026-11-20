@@ -48,11 +48,12 @@ const minuteAt = (clientY: number, column: Element) => {
  * Week calendar, 08:00-22:00. Three layers per day:
  * - zones: open areas (free time / options); with zones, everything else is shown greyed out
  * - blocks: chosen ranges (solid), clickable via onBlockClick
+ * - locked: booked sessions drawn on top, read-only
  * - preview: dashed ghost while drawing (draw) or hovering where place() would put a block
  * draw: press-drag on empty space to create a range. place: click inside a zone; place(day, minute) decides the block or null.
  */
-export function TimeGrid({ label, zones, blocks = [], draw, place, onPlace, onBlockClick, blockHint }: {
-  label: string; zones?: Block[]; blocks?: Block[];
+export function TimeGrid({ label, zones, blocks = [], locked = [], draw, place, onPlace, onBlockClick, blockHint }: {
+  label: string; zones?: Block[]; blocks?: Block[]; locked?: Block[];
   draw?: (b: Block) => void;
   place?: (day: number, minute: number) => Block | null; onPlace?: (b: Block) => void;
   onBlockClick?: (b: Block) => void; blockHint?: string;
@@ -114,6 +115,13 @@ export function TimeGrid({ label, zones, blocks = [], draw, place, onPlace, onBl
                 style={{ top: top(b.startTime), height: height(b) }}>
                 <span className="block pt-0.5">{b.startTime}–{b.endTime}</span>
               </button>
+            ))}
+            {locked.filter((b) => b.dayOfWeek === d).map((b) => (
+              <div key={`locked-${b.startTime}`} role="img" aria-label={`${DAY_LABEL[d]} ${b.startTime}–${b.endTime}, đã có buổi học`}
+                className="pointer-events-none absolute inset-x-1.5 z-[15] rounded-md border border-foreground/30 bg-foreground/75 px-1 text-[11px] font-medium text-background"
+                style={{ top: top(b.startTime), height: height(b) }}>
+                <span className="block pt-0.5">🔒 {b.startTime}–{b.endTime}</span>
+              </div>
             ))}
             {preview?.dayOfWeek === d && (
               <div aria-hidden className="pointer-events-none absolute inset-x-0.5 z-20 rounded-md border-2 border-dashed border-primary bg-primary/10 px-1 text-[11px] font-medium text-primary"

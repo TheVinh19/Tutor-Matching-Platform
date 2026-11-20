@@ -130,7 +130,7 @@ services:
       context: ../server
       args:
         MODULE: api-gateway
-    ports: ["127.0.0.1:8080:8080"]
+    ports: ["127.0.0.1:8090:8080"]
     environment:
       IDENTITY_SERVICE_URL: http://identity-service:8081
       TUTOR_SERVICE_URL: http://tutor-service:8082
