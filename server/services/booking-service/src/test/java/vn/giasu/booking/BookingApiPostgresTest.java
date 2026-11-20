@@ -302,6 +302,20 @@ class BookingApiPostgresTest {
     }
 
     @Test
+    void availabilityEditKeepsBookedTime() throws Exception {
+        UUID tutor = UUID.randomUUID();
+        openMondayMorning(tutor);
+        propose(tutor, requestPlan(UUID.randomUUID(), tutor), "08:00").andExpect(status().isOk()); // held Mondays 08:00-10:00
+        call(put("/api/v1/bookings/availability/me"), tutor, "TUTOR", "{\"windows\":[]}")
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("BOOKED_TIME_REMOVED"));
+        call(put("/api/v1/bookings/availability/me"), tutor, "TUTOR", """
+                {"windows":[{"dayOfWeek":1,"startTime":"10:00","endTime":"12:00"}]}""").andExpect(status().isConflict());
+        call(put("/api/v1/bookings/availability/me"), tutor, "TUTOR", """
+                {"windows":[{"dayOfWeek":1,"startTime":"08:00","endTime":"10:00"},{"dayOfWeek":3,"startTime":"14:00","endTime":"18:00"}]}""")
+                .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(2)));
+    }
+
+    @Test
     void cancelReportedSessionIsRescheduled() throws Exception {
         UUID tutor = UUID.randomUUID();
         UUID learner = UUID.randomUUID();

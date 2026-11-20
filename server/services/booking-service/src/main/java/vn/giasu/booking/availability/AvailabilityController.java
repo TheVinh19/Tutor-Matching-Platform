@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.ArrayList;
@@ -87,6 +88,22 @@ class AvailabilityController {
             }
         }
         tutors.requireApproved(tutorId);
+        // Booked time stays open: an upcoming held/booked session covered by the old windows must still be covered.
+        List<Slot> before = forTutor(tutorId);
+        List<FreeTime.Busy> upcoming = jdbc.sql("""
+                SELECT tutor_id, start_at, end_at FROM sessions
+                WHERE tutor_id = ? AND status IN ('HELD', 'SCHEDULED', 'CANCEL_REPORTED') AND start_at > now()""")
+                .param(tutorId).query(FreeTime.Busy.class).list();
+        for (FreeTime.Busy s : upcoming) {
+            LocalDateTime start = s.startAt().atZoneSameInstant(Schedule.ZONE).toLocalDateTime();
+            LocalTime end = s.endAt().atZoneSameInstant(Schedule.ZONE).toLocalTime();
+            int day = start.getDayOfWeek().getValue();
+            boolean wasCovered = before.stream().anyMatch(w -> w.dayOfWeek() == day && !w.startTime().isAfter(start.toLocalTime()) && !w.endTime().isBefore(end));
+            boolean covered = windows.stream().anyMatch(w -> w.dayOfWeek() == day && !w.startTime().isAfter(start.toLocalTime()) && !w.endTime().isBefore(end));
+            if (wasCovered && !covered) {
+                throw new ApiException(HttpStatus.CONFLICT, "BOOKED_TIME_REMOVED", "Không thể bỏ khoảng rảnh đang có buổi học đã giữ/chốt", s.startAt());
+            }
+        }
         jdbc.sql("DELETE FROM availability_slots WHERE tutor_id = ?").param(tutorId).update();
         for (WindowRequest w : windows) {
             jdbc.sql("INSERT INTO availability_slots (id, tutor_id, day_of_week, start_time, end_time, mode, effective_from) VALUES (?, ?, ?, ?, ?, 'FLEX', ?)")
