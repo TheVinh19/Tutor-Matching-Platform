@@ -7,12 +7,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import vn.giasu.booking.TutorClient;
+import vn.giasu.booking.availability.FreeTime.Window;
 import vn.giasu.booking.Schedule;
 import vn.giasu.common.web.ApiException;
 
@@ -45,9 +43,6 @@ class AvailabilityController {
                        @NotNull Mode mode, @NotNull LocalDate effectiveFrom, LocalDate effectiveTo) {}
     record WindowRequest(@NotNull @Min(1) @Max(7) Integer dayOfWeek, @NotNull LocalTime startTime, @NotNull LocalTime endTime) {}
     record WindowsRequest(@NotNull @Size(max = 50) List<@Valid @NotNull WindowRequest> windows) {}
-    /** A free stretch of a weekday, at least one session long. */
-    record Window(int dayOfWeek, LocalTime startTime, LocalTime endTime) {}
-    record SessionTime(UUID tutorId, OffsetDateTime startAt, OffsetDateTime endAt) {}
     record Slot(UUID id, UUID tutorId, int dayOfWeek, LocalTime startTime, LocalTime endTime, Mode mode,
                 LocalDate effectiveFrom, LocalDate effectiveTo) {}
 
@@ -112,42 +107,16 @@ class AvailabilityController {
                       @RequestParam(required = false) Mode mode) {
         UUID me = jwt == null ? tutorId : UUID.fromString(jwt.getSubject());
         LocalDate toDate = fromDate.plusWeeks(weeks);
-        List<SessionTime> sessions = jdbc.sql("""
-                SELECT tutor_id, start_at, end_at FROM sessions
-                WHERE status NOT IN ('CANCELLED', 'RELEASED') AND (tutor_id = :tutor OR learner_id = :me) AND start_at < :to AND end_at > :from""")
-                .param("tutor", tutorId).param("me", me)
-                .param("from", fromDate.atStartOfDay(Schedule.ZONE).toOffsetDateTime())
-                .param("to", toDate.atStartOfDay(Schedule.ZONE).toOffsetDateTime())
-                .query(SessionTime.class).list();
-        Map<Integer, List<int[]>> blocked = new HashMap<>();
-        for (SessionTime s : sessions) {
-            int gap = s.tutorId().equals(tutorId) ? (int) Schedule.GAP.toMinutes() : 0;
-            LocalDateTime start = s.startAt().atZoneSameInstant(Schedule.ZONE).toLocalDateTime();
-            LocalDateTime end = s.endAt().atZoneSameInstant(Schedule.ZONE).toLocalDateTime();
-            blocked.computeIfAbsent(start.getDayOfWeek().getValue(), d -> new ArrayList<>())
-                    .add(new int[] {minutes(start.toLocalTime()) - gap, minutes(end.toLocalTime()) + gap});
-        }
-        int min = (int) Schedule.SESSION_LENGTH.toMinutes();
+        Map<Integer, List<int[]>> blocked = FreeTime.byWeekday(FreeTime.busy(jdbc, tutorId, me,
+                fromDate.atStartOfDay(Schedule.ZONE).toOffsetDateTime(), toDate.atStartOfDay(Schedule.ZONE).toOffsetDateTime()), tutorId);
         List<Window> free = new ArrayList<>();
         for (Slot w : forTutor(tutorId)) {
             if (mode != null && w.mode() != Mode.FLEX && w.mode() != mode) continue;
             if (w.effectiveFrom().isAfter(fromDate) || (w.effectiveTo() != null && w.effectiveTo().isBefore(toDate.minusDays(1)))) continue;
-            List<int[]> cuts = blocked.getOrDefault(w.dayOfWeek(), List.of()).stream().sorted(Comparator.comparingInt(c -> c[0])).toList();
-            int cursor = minutes(w.startTime());
-            int end = minutes(w.endTime());
-            for (int[] c : cuts) {
-                if (c[1] <= cursor || c[0] >= end) continue;
-                if (c[0] - cursor >= min) free.add(window(w.dayOfWeek(), cursor, c[0]));
-                cursor = Math.max(cursor, c[1]);
-            }
-            if (end - cursor >= min) free.add(window(w.dayOfWeek(), cursor, end));
+            free.addAll(FreeTime.remaining(w.dayOfWeek(), w.startTime(), w.endTime(), blocked.getOrDefault(w.dayOfWeek(), List.of())));
         }
         return free;
     }
-
-    private static int minutes(LocalTime t) { return t.getHour() * 60 + t.getMinute(); }
-
-    private static Window window(int day, int from, int to) { return new Window(day, LocalTime.of(from / 60, from % 60), LocalTime.of(to / 60, to % 60)); }
 
     @PostMapping("/api/v1/bookings/availability")
     @PreAuthorize("hasRole('TUTOR')")

@@ -37,6 +37,8 @@ export type Session = {
   id: string; planId: string; tutorId: string; learnerId: string; startAt: string; endAt: string; status: SessionStatus;
   meetLink: string | null; cancelReason: string | null; cancelledBy: string | null; cancelledAt: string | null;
   completedAt: string | null; confirmDeadline: string | null; confirmedAt: string | null; autoConfirmed: boolean; disputeReason: string | null;
+  /** Date range of the learner's "can attend" offer on a CANCEL_REPORTED session, waiting for the tutor to pick a slot. */
+  offerFrom: string | null; offerTo: string | null;
 };
 export type WeekCell = { dayOfWeek: number; startTime: string };
 export type WeekWindow = { dayOfWeek: number; startTime: string; endTime: string };

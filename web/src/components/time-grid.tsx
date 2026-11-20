@@ -128,6 +128,18 @@ export function TimeGrid({ label, zones, blocks = [], draw, place, onPlace, onBl
   );
 }
 
+/** Adds a window, merging it with windows of the same day it touches or overlaps. */
+export function addWindow(windows: Block[], w: Block) {
+  let from = toMin(w.startTime);
+  let to = toMin(w.endTime);
+  const rest = windows.filter((x) => {
+    const touches = x.dayOfWeek === w.dayOfWeek && toMin(x.startTime) <= to && from <= toMin(x.endTime);
+    if (touches) { from = Math.min(from, toMin(x.startTime)); to = Math.max(to, toMin(x.endTime)); }
+    return !touches;
+  });
+  return [...rest, block(w.dayOfWeek, from, to)];
+}
+
 /** "T3 09:00–11:00, T5 17:30–19:30" for summaries. */
 export function describeBlocks(blocks: Block[]) {
   return [...blocks]

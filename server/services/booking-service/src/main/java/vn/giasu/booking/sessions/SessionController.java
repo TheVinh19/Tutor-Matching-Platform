@@ -31,7 +31,8 @@ import vn.giasu.common.web.ApiException;
 
 /**
  * Session lifecycle: SCHEDULED -> (tutor) COMPLETED_PENDING_CONFIRM -> (learner, 24h) CONFIRMED | DISPUTED.
- * Either party may report busy/cancel: CANCEL_REPORTED keeps the slot and waits for admin handling (HUY02).
+ * Either party may report busy/cancel: CANCEL_REPORTED keeps the slot until the session is moved to a new time
+ * (back to SCHEDULED), see RescheduleController.
  */
 @RestController
 class SessionController {
@@ -149,7 +150,7 @@ class SessionController {
         return s;
     }
 
-    private static String local(OffsetDateTime t) {
+    static String local(OffsetDateTime t) {
         return t.atZoneSameInstant(Schedule.ZONE).toLocalDateTime().toString().replace('T', ' ');
     }
 }
