@@ -95,7 +95,9 @@ public class ProfileStore {
     public boolean transition(UUID accountId, Collection<Status> from, Status to, UUID actorId, String reason) {
         String timestamps = to == Status.PENDING
                 ? "submitted_at = now(), reject_reason = NULL"
-                : "reviewed_at = now(), reviewed_by = :actor, reject_reason = :reason";
+                : "reviewed_at = now(), reviewed_by = :actor, reject_reason = :reason"
+                        // Days at the current rank count from the first approval (P10).
+                        + (to == Status.APPROVED ? ", rank_since = coalesce(rank_since, now())" : "");
         int updated = jdbc.sql("UPDATE tutor_profiles SET status = :to, updated_at = now(), " + timestamps
                         + " WHERE account_id = :id AND status IN (:from)")
                 .param("to", to.name()).param("id", accountId).param("actor", actorId).param("reason", reason)

@@ -38,8 +38,21 @@ Mọi API đi qua gateway `:8080` (hoặc Nginx `:8088`), prefix `/api/v1/<khu>`
 | GET | `/api/v1/tutors/admin/profiles/{id}` | ADMIN | hồ sơ + lịch sử duyệt |
 | POST | `/api/v1/tutors/admin/profiles/{id}/approve` | ADMIN | body tùy chọn `{note}`; chỉ PENDING |
 | POST | `/api/v1/tutors/admin/profiles/{id}/reject` | ADMIN | `{reason}` bắt buộc |
-| POST | `/api/v1/tutors/reviews` | LEARNER | `{planId,content}` 10–2000 ký tự; chỉ chủ đơn, kỳ COMPLETED, trong 14 ngày, 1 lần/kỳ |
+| POST | `/api/v1/tutors/reviews` | LEARNER | `{planId,content}` 10–2000 ký tự; chỉ chủ đơn, kỳ HOAN_TAT_NGHIA_VU/KET_THUC_CO_HOAN_MOT_PHAN, trong 14 ngày, 1 lần/kỳ |
+| POST | `/api/v1/tutors/reviews/{id}/reply` | TUTOR của nhận xét | `{content}` ≤2000, một lần, công khai (`409 REPLY_EXISTS`) |
+| POST | `/api/v1/tutors/reviews/{id}/report` | TUTOR của nhận xét | `{reason}` báo vi phạm cho admin |
+| GET | `/api/v1/tutors/me/reviews` | TUTOR | nhận xét về mình, kể cả bị ẩn |
+| GET | `/api/v1/tutors/admin/reviews?filter=REPORTED\|HIDDEN\|ALL` | ADMIN | bản gốc, mặc định REPORTED |
+| POST | `/api/v1/tutors/admin/reviews/{id}/hide` · `/restore` | ADMIN | `{reason}`; ẩn/khôi phục toàn bộ, lưu lịch sử (`GET .../moderation`) |
+| GET | `/api/v1/tutors/me/exp` | TUTOR | `{view:{rank,exp,stats,completionRate,flag},entries,decisions}`; EXP = max(0, tổng sổ) |
+| GET | `/api/v1/tutors/admin/ranks?flag=OK\|ELIGIBLE_UP\|MUST_REVIEW` | ADMIN | gia sư đã duyệt kèm cờ xét Hạng (P10); Hạng không tự đổi |
+| GET | `/api/v1/tutors/admin/ranks/{id}` | ADMIN | chi tiết, đồng bộ trước khi trả |
+| POST | `/api/v1/tutors/admin/ranks/sync` | ADMIN | đồng bộ sổ EXP mọi gia sư (job tự chạy mỗi 10 phút) |
+| POST | `/api/v1/tutors/admin/ranks/{id}/decide` | ADMIN | `{rank,reason}`; lên đúng 1 bậc khi ELIGIBLE_UP (`409 NOT_ELIGIBLE`), hạ luôn được |
+| POST | `/api/v1/tutors/admin/ranks/{id}/penalties` | ADMIN | `{points:30\|100\|200,reason,refType:SESSION\|PLAN,refId}`; một phạt/ref (`409 PENALTY_EXISTS`) |
 | GET | `/api/v1/tutors/internal/profiles/{id}` | SERVICE | trạng thái duyệt, hình thức, Hạng, môn/cấp |
+
+Duyệt hồ sơ `POST /api/v1/tutors/admin/profiles/{id}/approve` nhận thêm `entryRank2: true` để xếp Hạng 2 đầu vào (+1.200 EXP khởi tạo). Hồ sơ công khai `GET /api/v1/tutors/{id}` có thêm `taughtSessions`, `completionRate` (null = chưa có dữ liệu), `tutorFaultFailed`; nhận xét công khai có `reply`, `repliedAt`.
 
 ## Booking
 
@@ -81,6 +94,7 @@ Mọi API đi qua gateway `:8080` (hoặc Nginx `:8088`), prefix `/api/v1/<khu>`
 | GET | `/api/v1/bookings/admin/plans?status=` | ADMIN | 100 kế hoạch mới nhất |
 | GET | `/api/v1/bookings/internal/availability/tutors` | SERVICE | dùng cho lọc lịch khi tìm kiếm |
 | GET | `/api/v1/bookings/internal/plans/{id}/review-eligibility` | SERVICE | dùng cho nhận xét |
+| GET | `/api/v1/bookings/internal/tutors/{tutorId}/exp-sources` | SERVICE | sự kiện EXP (+10 buổi CONFIRMED bắt đầu đúng phút, +30 kỳ HOAN_TAT_NGHIA_VU, +50 gia hạn hợp lệ, mỗi sự kiện một `key`) và số liệu xét Hạng |
 
 Job mỗi 60 giây: kế hoạch PROPOSED quá hạn giữ → EXPIRED (buổi HELD → RELEASED); buổi chờ xác nhận quá 24h và có `startedAt` → CONFIRMED (`autoConfirmed`); LEARNER_ABSENT_PENDING quá hạn → LEARNER_ABSENT; CANCEL_REPORTED quá `cancelDeadline` → CANCELLED; đề nghị đổi giờ quá hạn → EXPIRED; nhắc buổi học trước 60 và 30 phút; nhắc gia hạn khi kỳ CONFIRMED còn ≤ 14 ngày.
 

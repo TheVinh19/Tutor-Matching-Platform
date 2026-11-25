@@ -502,6 +502,10 @@ class BookingApiPostgresTest {
         call(get(url), learner, "LEARNER", null).andExpect(jsonPath("$.status").value("CONFIRMED")).andExpect(jsonPath("$.autoConfirmed").value(true));
         call(get("/api/v1/bookings/sessions/" + s.get(1)), learner, "LEARNER", null).andExpect(jsonPath("$.status").value("COMPLETED_PENDING_CONFIRM"));
         call(post("/api/v1/bookings/sessions/" + s.get(1) + "/confirm"), learner, "LEARNER", null).andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+        // Late start and no start: both taught, neither earns the +10.
+        call(get("/api/v1/bookings/internal/tutors/" + tutor + "/exp-sources"), UUID.randomUUID(), "SERVICE", null)
+                .andExpect(jsonPath("$.events", hasSize(0))).andExpect(jsonPath("$.stats.taughtSessions").value(2));
     }
 
     @Test
@@ -683,6 +687,17 @@ class BookingApiPostgresTest {
         for (int i = 0; i < 4; i++) teachAndConfirm(s.get(i), 5 - i, tutor, learner);
         assertEquals("HOAN_TAT_NGHIA_VU", planStatus(old));
         call(get("/api/v1/bookings/plans/" + next), learner, "LEARNER", null).andExpect(jsonPath("$.plan.renewalQualifiedAt").isNotEmpty());
+
+        // EXP sources for tutor-service: 4 on-time sessions, the completed period, the qualified renewal.
+        String sources = "/api/v1/bookings/internal/tutors/" + tutor + "/exp-sources";
+        call(get(sources), tutor, "TUTOR", null).andExpect(status().isForbidden());
+        call(get(sources), UUID.randomUUID(), "SERVICE", null)
+                .andExpect(jsonPath("$.events", hasSize(6)))
+                .andExpect(jsonPath("$.events[?(@.type == 'SESSION_ON_TIME')]", hasSize(4)))
+                .andExpect(jsonPath("$.events[?(@.type == 'PERIOD_COMPLETED')].key", hasItem("period:" + old)))
+                .andExpect(jsonPath("$.events[?(@.type == 'RENEWAL')].key", hasItem("renewal:" + next)))
+                .andExpect(jsonPath("$.stats.taughtSessions").value(4)).andExpect(jsonPath("$.stats.distinctLearners").value(1))
+                .andExpect(jsonPath("$.stats.renewals").value(1)).andExpect(jsonPath("$.stats.openIssues").value(0));
     }
 
     @Test

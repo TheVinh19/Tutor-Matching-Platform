@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, ErrorBox } from "@/components/common";
-import { MODE_LABEL } from "@/config/labels";
+import { fmtRate, MODE_LABEL } from "@/config/labels";
 import { useLoad } from "@/hooks/use-load";
 import { fmtDate } from "@/lib/api";
 import { isoToday, norm, TimeGrid } from "@/components/time-grid";
@@ -40,6 +40,10 @@ export function TutorDetail({ id, role }: { id: string; role: Role | null }) {
             <p><span className="font-medium">Kinh nghiệm:</span> {tutor.experience || "—"}</p>
             <p><span className="font-medium">Môn/cấp đã duyệt:</span> {tutor.subjects.map(subjectLevel).join(", ")}</p>
             {tutor.areaCodes.length > 0 && <p><span className="font-medium">Khu vực dạy trực tiếp:</span> {tutor.areaCodes.map(area).join("; ")}</p>}
+            <p className="text-muted-foreground">
+              {tutor.taughtSessions ?? 0} buổi đã dạy · Tỷ lệ hoàn thành: {fmtRate(tutor.completionRate)}
+              {(tutor.tutorFaultFailed ?? 0) > 0 && <> · {tutor.tutorFaultFailed} buổi thất bại do gia sư</>}
+            </p>
           </CardContent>
         </Card>
         {/* Learners see the same free time inside the booking form. */}
@@ -59,6 +63,12 @@ export function TutorDetail({ id, role }: { id: string; role: Role | null }) {
               <blockquote key={r.id} className="border-l-2 border-primary pl-3 text-sm">
                 <p className="whitespace-pre-line">{r.content}</p>
                 <footer className="mt-1 text-xs text-muted-foreground">{fmtDate(r.createdAt)}</footer>
+                {r.reply && (
+                  <div className="mt-2 rounded-md bg-muted p-2">
+                    <p className="text-xs font-medium">Gia sư phản hồi</p>
+                    <p className="whitespace-pre-line">{r.reply}</p>
+                  </div>
+                )}
               </blockquote>
             )) : <Empty>Chưa có nhận xét.</Empty>}
           </CardContent>

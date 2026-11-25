@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import vn.giasu.common.web.ApiException;
+import vn.giasu.tutor.experience.ExpLedger;
+import vn.giasu.tutor.ranks.RankRules;
 import vn.giasu.tutor.profiles.ProfileStore.Mode;
 import vn.giasu.tutor.profiles.ProfileStore.Profile;
 import vn.giasu.tutor.profiles.ProfileStore.Status;
@@ -34,10 +36,12 @@ class TutorProfileController {
                           @NotNull @Size(max = 20) List<@NotBlank @Size(max = 32) String> areaCodes) {}
 
     /** What anyone may see: approved profiles only, no review notes. */
+    /** P12 public numbers: taught sessions, rank completion rate (null = no data yet), verified tutor-fault failures. */
     record PublicProfile(UUID accountId, String fullName, String bio, String experience, Mode teachingMode, int rank,
-                         List<SubjectLevel> subjects, List<String> areaCodes) {
-        static PublicProfile of(Profile p) {
-            return new PublicProfile(p.accountId(), p.fullName(), p.bio(), p.experience(), p.teachingMode(), p.rank(), p.subjects(), p.areaCodes());
+                         List<SubjectLevel> subjects, List<String> areaCodes, int taughtSessions, Double completionRate, int tutorFaultFailed) {
+        static PublicProfile of(Profile p, ExpLedger.Stats s) {
+            return new PublicProfile(p.accountId(), p.fullName(), p.bio(), p.experience(), p.teachingMode(), p.rank(), p.subjects(), p.areaCodes(),
+                    s.taughtSessions(), RankRules.completionRate(s.taughtSessions(), s.tutorFaultFailed()), s.tutorFaultFailed());
         }
     }
 
@@ -45,8 +49,12 @@ class TutorProfileController {
     record InternalProfile(UUID accountId, String fullName, Status status, Mode teachingMode, int rank, List<SubjectLevel> subjects) {}
 
     private final ProfileStore store;
+    private final ExpLedger ledger;
 
-    TutorProfileController(ProfileStore store) { this.store = store; }
+    TutorProfileController(ProfileStore store, ExpLedger ledger) {
+        this.store = store;
+        this.ledger = ledger;
+    }
 
     @GetMapping("/api/v1/tutors/me/profile")
     @PreAuthorize("hasRole('TUTOR')")
@@ -94,7 +102,7 @@ class TutorProfileController {
 
     @GetMapping("/api/v1/tutors/{accountId}")
     PublicProfile publicProfile(@PathVariable UUID accountId) {
-        return store.find(accountId).filter(p -> p.status() == Status.APPROVED).map(PublicProfile::of)
+        return store.find(accountId).filter(p -> p.status() == Status.APPROVED).map(p -> PublicProfile.of(p, ledger.stats(accountId)))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "TUTOR_NOT_FOUND", "Không tìm thấy gia sư"));
     }
 

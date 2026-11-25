@@ -33,6 +33,7 @@ export function ProfileReview() {
 function ProfileCard({ profile: p, onChange }: { profile: TutorProfile; onChange: () => void }) {
   const { subjectLevel, area } = useCatalog();
   const [showHistory, setShowHistory] = useState(false);
+  const [entryRank2, setEntryRank2] = useState(false);
   const { data: detail } = useLoad<{ history: HistoryEntry[] }>(showHistory ? `/v1/tutors/admin/profiles/${p.accountId}` : null);
   const { pending, error, run } = useAction();
   const decide = (path: string, body?: unknown) => run(async () => {
@@ -54,8 +55,12 @@ function ProfileCard({ profile: p, onChange }: { profile: TutorProfile; onChange
         {p.rejectReason && <p><span className="font-medium">Lý do từ chối:</span> {p.rejectReason}</p>}
         <ErrorBox error={error} />
         {p.status === "PENDING" && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button size="sm" disabled={pending} onClick={() => decide("approve")}>Duyệt</Button>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <label className="flex w-full items-center gap-2 text-sm">
+              <input type="checkbox" checked={entryRank2} onChange={(e) => setEntryRank2(e.target.checked)} />
+              Xếp Hạng 2 đầu vào (đã kiểm tra bằng cấp và ≥ 1 năm kinh nghiệm; khởi tạo 1.200 EXP)
+            </label>
+            <Button size="sm" disabled={pending} onClick={() => decide("approve", { entryRank2 })}>Duyệt</Button>
             <ReasonAction label="Từ chối" variant="destructive" placeholder="Lý do từ chối (gia sư sẽ thấy)" onSubmit={(reason) => decide("reject", { reason })} />
           </div>
         )}

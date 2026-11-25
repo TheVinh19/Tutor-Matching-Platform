@@ -13,9 +13,29 @@ export type TutorProfile = {
   status: ProfileStatus; rejectReason: string | null; submittedAt: string | null; reviewedAt: string | null;
   subjects: SubjectLevel[]; areaCodes: string[];
 };
-export type PublicTutor = Pick<TutorProfile, "accountId" | "fullName" | "bio" | "experience" | "teachingMode" | "rank" | "subjects" | "areaCodes">;
+export type PublicTutor = Pick<TutorProfile, "accountId" | "fullName" | "bio" | "experience" | "teachingMode" | "rank" | "subjects" | "areaCodes"> & {
+  /** Only on the profile endpoint, not in search results. completionRate null = no data yet. */
+  taughtSessions?: number; completionRate?: number | null; tutorFaultFailed?: number;
+};
 export type SearchPage = { items: PublicTutor[]; page: number; size: number; total: number };
-export type Review = { id: string; planId: string; content: string; createdAt: string };
+export type Review = { id: string; planId: string; content: string; createdAt: string; reply: string | null; repliedAt: string | null };
+export type FullReview = Review & {
+  tutorId: string; learnerId: string; hidden: boolean; reportReason: string | null; reportedAt: string | null;
+};
+export type ReviewModeration = { action: "HIDE" | "RESTORE"; reason: string; actorId: string; createdAt: string };
+
+export type RankFlag = "OK" | "ELIGIBLE_UP" | "MUST_REVIEW";
+export type ExpStats = { taughtSessions: number; tutorFaultFailed: number; distinctLearners: number; renewals: number; openIssues: number; syncedAt: string | null };
+export type RankView = {
+  accountId: string; fullName: string; rank: number; entryRank2: boolean; rankSince: string | null; exp: number;
+  stats: ExpStats; completionRate: number | null; flag: RankFlag;
+};
+export type ExpEntry = {
+  id: string; sourceKey: string; type: "INITIAL" | "SESSION_ON_TIME" | "PERIOD_COMPLETED" | "RENEWAL" | "PENALTY";
+  points: number; refType: string | null; refId: string | null; reason: string | null; occurredAt: string; createdAt: string;
+};
+export type RankDecision = { fromRank: number; toRank: number; reason: string; actorId: string; createdAt: string };
+export type RankDetail = { view: RankView; entries: ExpEntry[]; decisions: RankDecision[] };
 export type HistoryEntry = { action: string; reason: string | null; actorId: string; createdAt: string };
 
 export type Slot = {

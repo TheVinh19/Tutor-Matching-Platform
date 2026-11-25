@@ -1,4 +1,4 @@
-import type { Mode, PlanStatus, ProfileStatus, SessionStatus } from "@/types/api";
+import type { ExpEntry, Mode, PlanStatus, ProfileStatus, RankFlag, SessionStatus } from "@/types/api";
 
 type Tone = "default" | "secondary" | "outline" | "destructive";
 
@@ -23,6 +23,16 @@ export const SESSION_STATUS: Record<SessionStatus, [string, Tone]> = {
   TUTOR_ABSENT_REPORTED: ["Báo gia sư vắng", "destructive"],
   CANCELLED: ["Đã hủy", "outline"], RELEASED: ["Đã giải phóng", "outline"],
 };
-export const PARTY_LABEL = { LEARNER: "Học sinh", TUTOR: "Gia sư" } as const;
+export const RANK_LABEL = ["", "Hạng 1 · Cơ bản", "Hạng 2 · Kinh nghiệm", "Hạng 3 · Chuyên gia"];
+export const RANK_FLAG: Record<RankFlag, [string, Tone]> = {
+  OK: ["Ổn định", "outline"], ELIGIBLE_UP: ["Đủ điều kiện lên Hạng", "default"], MUST_REVIEW: ["Mất điều kiện giữ Hạng", "destructive"],
+};
+export const EXP_TYPE: Record<ExpEntry["type"], string> = {
+  INITIAL: "Khởi tạo Hạng 2 đầu vào", SESSION_ON_TIME: "Buổi dạy đúng giờ", PERIOD_COMPLETED: "Kỳ hoàn tất nghĩa vụ",
+  RENEWAL: "Gia hạn hợp lệ", PENALTY: "Phạt sau xác minh",
+};
+/** Rank completion rate; P12: no sample shows "chưa có dữ liệu". */
+export const fmtRate = (rate: number | null | undefined) => (rate == null ? "Chưa có dữ liệu" : `${Math.round(rate * 1000) / 10}%`);
+export const PARTY_LABEL ={ LEARNER: "Học sinh", TUTOR: "Gia sư" } as const;
 /** Periods that are over normally: contact stays visible, the learner may review within 14 days. */
 export const CLOSED_PLAN: PlanStatus[] = ["HOAN_TAT_NGHIA_VU", "KET_THUC_CO_HOAN_MOT_PHAN"];
