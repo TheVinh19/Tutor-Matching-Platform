@@ -11,7 +11,7 @@ import { MODE_LABEL } from "@/config/labels";
 import { useLoad } from "@/hooks/use-load";
 import { api, fmtDate } from "@/lib/api";
 import { useCatalog } from "@/features/tutors/catalog";
-import type { Mode, PlanDetail, PublicTutor, WeekWindow } from "@/types/api";
+import type { Mode, Plan, PlanDetail, PublicTutor, WeekWindow } from "@/types/api";
 
 const PER_WEEK = [1, 2, 3, 4, 5, 6, 7];
 const WEEKS = [4, 8, 12];
@@ -39,16 +39,21 @@ function Choice<T extends string | number>({ label, options, value, onChange, re
  * Free time already excludes booked sessions and their 60-minute gaps, so nothing outside it can be picked.
  * The tutor then accepts these sessions as they are or rejects the request.
  */
-export function RequestWizard({ tutor }: { tutor: PublicTutor }) {
+export function RequestWizard({ tutor, renew }: {
+  tutor: PublicTutor;
+  /** Renewal of this period: same subject and mode, starts after it ends, prefilled with its weekly sessions. */
+  renew?: { plan: Plan; slots: Block[] };
+}) {
   const router = useRouter();
   const { subjectLevel } = useCatalog();
-  const modes: Mode[] = tutor.teachingMode === "FLEX" ? ["ONLINE", "OFFLINE"] : [tutor.teachingMode];
+  const modes: Mode[] = renew ? [renew.plan.mode] : tutor.teachingMode === "FLEX" ? ["ONLINE", "OFFLINE"] : [tutor.teachingMode];
   const [subject, setSubject] = useState<number | null>(tutor.subjects.length === 1 ? 0 : null);
   const [mode, setMode] = useState<Mode>(modes[0]);
-  const [wanted, setPerWeek] = useState(2);
-  const [startDate, setStartDate] = useState(addDays(isoToday(), 1));
+  const [wanted, setPerWeek] = useState(renew?.slots.length || 2);
+  const minStart = renew?.plan.endDate && renew.plan.endDate >= isoToday() ? addDays(renew.plan.endDate, 1) : addDays(isoToday(), 1);
+  const [startDate, setStartDate] = useState(minStart);
   const [weeks, setWeeks] = useState(4);
-  const [picked, setPicked] = useState<Block[]>([]);
+  const [picked, setPicked] = useState<Block[]>(renew?.slots ?? []);
   const { data } = useLoad<WeekWindow[]>(startDate ? `/v1/bookings/availability/tutors/${tutor.accountId}/free?fromDate=${startDate}&weeks=${weeks}&mode=${mode}` : null);
   const { pending, error, run } = useAction();
 
@@ -59,8 +64,7 @@ export function RequestWizard({ tutor }: { tutor: PublicTutor }) {
   const perWeek = Math.min(wanted, Math.max(maxPerWeek, 1));
   // Picks that fell outside free time after changing date, length or mode are dropped silently.
   const valid = picked.filter((p) => free.some((z) => inside(z, p)));
-  const minStart = addDays(isoToday(), 1);
-  const ready = subject !== null && valid.length === perWeek && startDate >= minStart;
+  const ready = (renew || subject !== null) && valid.length === perWeek && startDate >= minStart;
   // Exactly perWeek sessions, one per day: a pick on a day already used moves that day's session; when full, the oldest pick is replaced.
   const keepFor = (day: number) => {
     const others = valid.filter((p) => p.dayOfWeek !== day);
@@ -76,6 +80,16 @@ export function RequestWizard({ tutor }: { tutor: PublicTutor }) {
   };
 
   async function submit() {
+    const preferredSlots = valid.map((p) => ({ dayOfWeek: p.dayOfWeek, startTime: p.startTime }));
+    if (renew) {
+      await run(async () => {
+        const detail = await api<PlanDetail>(`/v1/bookings/plans/${renew.plan.id}/renew`, {
+          method: "POST", body: { sessionsPerWeek: perWeek, startDate, weeks, preferredSlots },
+        });
+        router.push(`/learner/plans/${detail.plan.id}`);
+      });
+      return;
+    }
     if (subject === null) return;
     const s = tutor.subjects[subject];
     await run(async () => {
@@ -83,7 +97,7 @@ export function RequestWizard({ tutor }: { tutor: PublicTutor }) {
         method: "POST",
         body: {
           tutorId: tutor.accountId, subjectCode: s.subjectCode, levelCode: s.levelCode, mode, sessionsPerWeek: perWeek, startDate, weeks,
-          preferredSlots: valid.map((p) => ({ dayOfWeek: p.dayOfWeek, startTime: p.startTime })),
+          preferredSlots,
         },
       });
       router.push(`/learner/plans/${detail.plan.id}`);
@@ -92,11 +106,15 @@ export function RequestWizard({ tutor }: { tutor: PublicTutor }) {
 
   return (
     <Card className="border-primary/40">
-      <CardHeader><CardTitle>Đặt lịch học</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{renew ? "Gia hạn kỳ học" : "Đặt lịch học"}</CardTitle></CardHeader>
       <CardContent>
         <form className="grid gap-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
-          <Choice label="1. Môn và cấp học" options={tutor.subjects.map((_, i) => i)} value={subject} onChange={setSubject}
-            render={(i) => subjectLevel(tutor.subjects[i])} />
+          {renew ? (
+            <p className="text-sm">Cùng gia sư, môn {subjectLevel(renew.plan)}, {MODE_LABEL[renew.plan.mode]}. Giờ học đã điền sẵn theo kỳ cũ, có thể chọn lại.</p>
+          ) : (
+            <Choice label="1. Môn và cấp học" options={tutor.subjects.map((_, i) => i)} value={subject} onChange={setSubject}
+              render={(i) => subjectLevel(tutor.subjects[i])} />
+          )}
           {modes.length > 1 && <Choice label="Hình thức" options={modes} value={mode} onChange={setMode} render={(m) => MODE_LABEL[m]} />}
           <Choice label="2. Số buổi mỗi tuần" options={perWeekOptions} value={perWeek} onChange={setPerWeek} render={(n) => `${n} buổi`} />
           <div className="grid grid-cols-[1fr_auto] items-end gap-3">

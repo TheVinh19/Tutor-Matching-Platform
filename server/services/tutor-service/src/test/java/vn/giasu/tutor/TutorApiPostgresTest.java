@@ -197,10 +197,14 @@ class TutorApiPostgresTest {
         when(booking.planEligibility(plan)).thenReturn(Optional.of(new BookingClient.PlanEligibility(plan, learner, tutor, "CONFIRMED", null)));
         call(post("/api/v1/tutors/reviews"), learner, "LEARNER", json).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("REVIEW_NOT_ALLOWED"));
 
-        when(booking.planEligibility(plan)).thenReturn(Optional.of(new BookingClient.PlanEligibility(plan, learner, tutor, "COMPLETED", Instant.now().minus(Duration.ofDays(15)))));
+        // Still owing obligations (open dispute): no review yet.
+        when(booking.planEligibility(plan)).thenReturn(Optional.of(new BookingClient.PlanEligibility(plan, learner, tutor, "HET_KY_CON_NGHIA_VU", null)));
+        call(post("/api/v1/tutors/reviews"), learner, "LEARNER", json).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("REVIEW_NOT_ALLOWED"));
+
+        when(booking.planEligibility(plan)).thenReturn(Optional.of(new BookingClient.PlanEligibility(plan, learner, tutor, "HOAN_TAT_NGHIA_VU", Instant.now().minus(Duration.ofDays(15)))));
         call(post("/api/v1/tutors/reviews"), learner, "LEARNER", json).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("REVIEW_WINDOW_CLOSED"));
 
-        when(booking.planEligibility(plan)).thenReturn(Optional.of(new BookingClient.PlanEligibility(plan, learner, tutor, "COMPLETED", Instant.now().minus(Duration.ofDays(1)))));
+        when(booking.planEligibility(plan)).thenReturn(Optional.of(new BookingClient.PlanEligibility(plan, learner, tutor, "KET_THUC_CO_HOAN_MOT_PHAN", Instant.now().minus(Duration.ofDays(1)))));
         call(post("/api/v1/tutors/reviews"), UUID.randomUUID(), "LEARNER", json).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("NOT_PLAN_OWNER"));
         call(post("/api/v1/tutors/reviews"), tutor, "TUTOR", json).andExpect(status().isForbidden());
         call(post("/api/v1/tutors/reviews"), learner, "LEARNER", json).andExpect(status().isCreated());

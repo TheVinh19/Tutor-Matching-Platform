@@ -61,7 +61,10 @@ class PlanController {
                           @NotNull @Size(min = 1, max = 14) List<@Valid @NotNull WeeklySlot> slots,
                           @Size(max = 500) @Pattern(regexp = "https://\\S+", message = "phải là link https") String meetLink) {}
     record ReasonRequest(@NotBlank @Size(max = 1000) String reason) {}
-    record PlanDetail(Plan plan, List<Session> sessions, List<Plans.Cell> preferredSlots) {}
+    /** Renewal: same tutor, subject, level and mode as the old period; the learner picks the new weekly slots freely. */
+    record RenewRequest(@Size(max = 1000) String note, @NotNull @Min(1) @Max(7) Integer sessionsPerWeek, @NotNull LocalDate startDate,
+                        @NotNull @Min(1) @Max(26) Integer weeks, @NotNull @Size(min = 1, max = 35) List<@Valid @NotNull WeeklySlot> preferredSlots) {}
+    record PlanDetail(Plan plan, List<Session> sessions, List<Plans.Cell> preferredSlots, SlotChangeController.SlotChange pendingSlotChange) {}
     record Conflict(OffsetDateTime startAt, OffsetDateTime endAt, String side) {}
     record Eligibility(UUID planId, UUID learnerId, UUID tutorId, String status, OffsetDateTime closedAt) {}
 
@@ -84,6 +87,39 @@ class PlanController {
     @ResponseStatus(HttpStatus.CREATED)
     @Transactional
     PlanDetail request(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreateRequest r) {
+        return create(Plans.caller(jwt), r, null);
+    }
+
+    /**
+     * P09: the learner asks for the next period early; it is an ordinary request linked to the old one and holds nothing
+     * until the tutor proposes and the learner confirms (no priority over other learners).
+     */
+    @PostMapping("/api/v1/bookings/plans/{id}/renew")
+    @PreAuthorize("hasRole('LEARNER')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Transactional
+    PlanDetail renew(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody RenewRequest r) {
+        Plan old = plans.getForUpdate(id);
+        Plans.require(old.learnerId().equals(Plans.caller(jwt)), "NOT_PLAN_OWNER", "Chỉ tài khoản đứng tên đơn được gia hạn");
+        Plans.requireStatus(List.of("CONFIRMED", "HOAN_TAT_NGHIA_VU", "KET_THUC_CO_HOAN_MOT_PHAN").contains(old.status()),
+                "Chỉ gia hạn kỳ đang học hoặc đã kết thúc bình thường");
+        if (old.endDate() != null && !r.startDate().isAfter(old.endDate())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE", "Kỳ gia hạn phải bắt đầu sau ngày kết thúc kỳ cũ " + old.endDate());
+        }
+        // One live renewal per period: a pending one, or one already confirmed (the index guards the pending case under races).
+        boolean exists = jdbc.sql("SELECT count(*) FROM plans WHERE renewed_from = ? AND status NOT IN ('REJECTED', 'CANCELLED', 'EXPIRED')")
+                .param(id).query(Long.class).single() > 0;
+        if (exists) throw new ApiException(HttpStatus.CONFLICT, "RENEWAL_EXISTS", "Kỳ này đã có yêu cầu gia hạn");
+        CreateRequest create = new CreateRequest(old.tutorId(), old.subjectCode(), old.levelCode(), PlanMode.valueOf(old.mode()), r.note(),
+                r.sessionsPerWeek(), r.startDate(), r.weeks(), r.preferredSlots());
+        try {
+            return create(old.learnerId(), create, id);
+        } catch (DataIntegrityViolationException e) {
+            throw new ApiException(HttpStatus.CONFLICT, "RENEWAL_EXISTS", "Kỳ này đã có yêu cầu gia hạn đang chờ"); // concurrent double click
+        }
+    }
+
+    private PlanDetail create(UUID learnerId, CreateRequest r, UUID renewedFrom) {
         TutorClient.TutorProfile tutor = tutors.requireApproved(r.tutorId());
         if (!tutor.subjects().contains(new TutorClient.SubjectLevel(r.subjectCode(), r.levelCode()))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "SUBJECT_NOT_OFFERED", "Gia sư chưa được duyệt dạy môn/cấp học này");
@@ -110,15 +146,15 @@ class PlanController {
             if (preferred.stream().map(WeeklySlot::dayOfWeek).distinct().count() != preferred.size()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "ONE_SLOT_PER_DAY", "Mỗi ngày chỉ chọn một ca");
             }
-            checkInsideAvailability(r.tutorId(), r.mode().name(), preferred, start, end);
+            checkInsideAvailability(jdbc, r.tutorId(), r.mode().name(), preferred, start, end);
         }
         UUID id = UUID.randomUUID();
-        UUID learnerId = Plans.caller(jwt);
         jdbc.sql("""
-                INSERT INTO plans (id, learner_id, tutor_id, subject_code, level_code, mode, note, status, sessions_per_week, weeks, start_date, end_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'REQUESTED', ?, ?, ?, ?)""")
+                INSERT INTO plans (id, learner_id, tutor_id, subject_code, level_code, mode, note, status, sessions_per_week, weeks, start_date, end_date,
+                                   renewed_from)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'REQUESTED', ?, ?, ?, ?, ?)""")
                 .params(id, learnerId, r.tutorId(), r.subjectCode(), r.levelCode(), r.mode().name(), r.note() == null ? "" : r.note().strip(),
-                        r.sessionsPerWeek(), r.weeks(), start, end)
+                        r.sessionsPerWeek(), r.weeks(), start, end, renewedFrom)
                 .update();
         for (WeeklySlot c : preferred) {
             jdbc.sql("INSERT INTO plan_preferred_slots (plan_id, day_of_week, start_time) VALUES (?, ?, ?)").params(id, c.dayOfWeek(), c.startTime()).update();
@@ -171,7 +207,7 @@ class PlanController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE", "Ngày bắt đầu/kết thúc không hợp lệ (tối đa 26 tuần)");
         }
         checkSlotRules(r.slots());
-        checkInsideAvailability(plan.tutorId(), plan.mode(), r.slots(), start, end);
+        checkInsideAvailability(jdbc, plan.tutorId(), plan.mode(), r.slots(), start, end);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         List<OffsetDateTime[]> generated = generate(r.slots(), start, end);
@@ -224,6 +260,7 @@ class PlanController {
         jdbc.sql("UPDATE plans SET status = 'CONFIRMED', payment_status = 'PAYMENT_PENDING_MOCK', confirmed_at = now(), updated_at = now() WHERE id = ?")
                 .param(id).update();
         notifier.send(plan.tutorId(), "PLAN_CONFIRMED", "Học sinh đã xác nhận kế hoạch", "Lịch học đã được chốt.", "PLAN", id);
+        if (plan.renewedFrom() != null) plans.qualifyRenewal(plan.renewedFrom());
         return detailOf(id);
     }
 
@@ -270,7 +307,7 @@ class PlanController {
     }
 
     private PlanDetail detailOf(UUID id) {
-        return new PlanDetail(plans.get(id), plans.sessionsOf(id), plans.preferredSlots(id));
+        return new PlanDetail(plans.get(id), plans.sessionsOf(id), plans.preferredSlots(id), SlotChangeController.pending(jdbc, id));
     }
 
     static void checkSlotRules(List<WeeklySlot> slots) {
@@ -292,7 +329,7 @@ class PlanController {
         }
     }
 
-    private void checkInsideAvailability(UUID tutorId, String mode, List<WeeklySlot> slots, LocalDate start, LocalDate end) {
+    static void checkInsideAvailability(JdbcClient jdbc, UUID tutorId, String mode, List<WeeklySlot> slots, LocalDate start, LocalDate end) {
         List<WeeklySlot> outside = slots.stream().filter(s -> jdbc.sql("""
                 SELECT count(*) FROM availability_slots
                 WHERE tutor_id = :tutor AND day_of_week = :day AND start_time <= :start AND end_time >= :end

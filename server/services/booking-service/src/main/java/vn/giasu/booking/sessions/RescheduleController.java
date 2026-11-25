@@ -95,7 +95,8 @@ class RescheduleController {
         try {
             jdbc.sql("""
                     UPDATE sessions SET status = 'SCHEDULED', start_at = ?, end_at = ?, block_until = ?, offer_from = NULL, offer_to = NULL,
-                        cancel_reason = NULL, cancelled_by = NULL, cancelled_at = NULL, updated_at = now() WHERE id = ?""")
+                        cancel_reason = NULL, cancelled_by = NULL, cancelled_at = NULL, cancel_deadline = NULL,
+                        reminded_60_at = NULL, reminded_30_at = NULL, updated_at = now() WHERE id = ?""")
                     .params(start, end, end.plus(Schedule.GAP), id).update();
         } catch (DataIntegrityViolationException e) {
             // Lost a race with another booking after the check above; the EXCLUDE constraints decided.

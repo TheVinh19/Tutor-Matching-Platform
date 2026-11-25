@@ -28,6 +28,7 @@ import vn.giasu.tutor.BookingClient.PlanEligibility;
 @RestController
 class ReviewController {
     static final Duration REVIEW_WINDOW = Duration.ofDays(14);
+    static final java.util.Set<String> REVIEWABLE = java.util.Set.of("HOAN_TAT_NGHIA_VU", "KET_THUC_CO_HOAN_MOT_PHAN");
 
     record ReviewRequest(@NotNull UUID planId, @NotBlank @Size(min = 10, max = 2000) String content) {}
     record ReviewView(UUID id, UUID planId, String content, java.time.OffsetDateTime createdAt) {}
@@ -50,7 +51,8 @@ class ReviewController {
         if (!plan.learnerId().equals(learnerId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "NOT_PLAN_OWNER", "Chỉ tài khoản đứng tên đơn được nhận xét");
         }
-        if (!"COMPLETED".equals(plan.status()) || plan.closedAt() == null) {
+        // P12: only periods closed as HOAN_TAT_NGHIA_VU or KET_THUC_CO_HOAN_MOT_PHAN open reviews.
+        if (!REVIEWABLE.contains(plan.status()) || plan.closedAt() == null) {
             throw new ApiException(HttpStatus.CONFLICT, "REVIEW_NOT_ALLOWED", "Kỳ học chưa hoàn tất nghĩa vụ");
         }
         if (Instant.now().isAfter(plan.closedAt().plus(REVIEW_WINDOW))) {

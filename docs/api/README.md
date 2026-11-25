@@ -53,28 +53,38 @@ Mọi API đi qua gateway `:8080` (hoặc Nginx `:8088`), prefix `/api/v1/<khu>`
 | DELETE | `/api/v1/bookings/availability/{id}` | TUTOR | không ảnh hưởng buổi đã giữ/chốt |
 | POST | `/api/v1/bookings/plans` | LEARNER | `{tutorId,subjectCode,levelCode,mode,note?,sessionsPerWeek,startDate,weeks,preferredSlots:[{dayOfWeek,startTime}]}` → REQUESTED; môn/cấp và hình thức phải nằm trong hồ sơ đã duyệt. Bốn trường lưới đi cùng nhau (thiếu → `INCOMPLETE_PREFERENCES`); đúng sessionsPerWeek buổi 2 tiếng (`WRONG_SLOT_COUNT`), mỗi ngày tối đa một buổi (`ONE_SLOT_PER_DAY`), giờ bắt đầu tùy ý, nằm trong lịch rảnh. Đây là lịch học sinh muốn; gia sư nhận nguyên hoặc từ chối. Buổi đề xuất không bị giữ chỗ |
 | GET | `/api/v1/bookings/plans/me?status=` | LEARNER/TUTOR | |
-| GET | `/api/v1/bookings/plans/{id}` | 2 bên hoặc ADMIN | kế hoạch + buổi + `preferredSlots` |
+| GET | `/api/v1/bookings/plans/{id}` | 2 bên hoặc ADMIN | kế hoạch + buổi + `preferredSlots` + `pendingSlotChange` |
+| POST | `/api/v1/bookings/plans/{id}/renew` | LEARNER chủ đơn | Gia hạn (P09): kỳ CONFIRMED/HOAN_TAT_NGHIA_VU/KET_THUC_CO_HOAN_MOT_PHAN. `{note?,sessionsPerWeek,startDate,weeks,preferredSlots}`; gia sư/môn/cấp/hình thức chép từ kỳ cũ; `startDate` sau `endDate` kỳ cũ. Tạo kế hoạch REQUESTED có `renewedFrom`, đi luồng propose/confirm. Mỗi kỳ một gia hạn → `409 RENEWAL_EXISTS`. `renewalQualifiedAt` đặt một lần khi kỳ mới CONFIRMED và kỳ cũ HOAN_TAT_NGHIA_VU |
+| POST | `/api/v1/bookings/plans/{id}/slot-changes` | 2 bên | Đổi giờ học (DOI05), kỳ CONFIRMED: `{fromDay,fromTime,toDay,toTime,effectiveFrom}`; mọi buổi SCHEDULED của ca cũ từ `effectiveFrom` dời sang thứ mới trong cùng tuần. Ca mới trong lịch rảnh. Một đề nghị chờ/kỳ (`409 SLOT_CHANGE_PENDING`). Hết hạn min(24h, buổi sớm nhất bị ảnh hưởng). Khung trống lấy từ `availability/tutors/{tutorId}/free` |
+| POST | `/api/v1/bookings/slot-changes/{id}/accept` | bên còn lại | dời toàn bộ trong một transaction; trùng → `409 SCHEDULE_CONFLICT`, không dời buổi nào |
+| POST | `/api/v1/bookings/slot-changes/{id}/decline` | bên còn lại | `{reason}`, giữ lịch cũ |
+| POST | `/api/v1/bookings/slot-changes/{id}/cancel` | người đề nghị | khi còn chờ |
 | POST | `/api/v1/bookings/plans/{id}/propose` | TUTOR của kế hoạch | Kế hoạch có lưới: `slots` phải là đúng các buổi trong `preferredSlots` (giao diện gửi nguyên các buổi học sinh chọn) (`WRONG_SLOT_COUNT`, `NOT_PREFERRED_SLOT`), ngày lấy theo học sinh, buổi còn dưới 12 giờ bị bỏ. Kế hoạch cũ: `{startDate,endDate?,slots:[{dayOfWeek,startTime}],meetLink?}`; mặc định 4 tuần, ca 120 phút, cách ca ≥60 phút, trong lịch rảnh; buổi đầu >12 giờ. Sinh buổi HELD, giữ tới min(24h, buổi đầu − 12h). Trùng → `409 SCHEDULE_CONFLICT` (`details` = buổi xung đột) |
 | POST | `/api/v1/bookings/plans/{id}/confirm` | LEARNER chủ đơn | PROPOSED → CONFIRMED, `paymentStatus=PAYMENT_PENDING_MOCK` (mục 4 thay bằng thanh toán). Hết hạn giữ → `409 HOLD_EXPIRED` |
-| GET | `/api/v1/bookings/plans/{id}/contact` | 2 bên hoặc ADMIN | `{learnerPhone,tutorPhone}`, chỉ khi CONFIRMED/COMPLETED, nếu không `409 INVALID_STATUS` (KN01: không có chat) |
+| GET | `/api/v1/bookings/plans/{id}/contact` | 2 bên hoặc ADMIN | `{learnerPhone,tutorPhone}`, chỉ khi CONFIRMED/HOAN_TAT_NGHIA_VU/KET_THUC_CO_HOAN_MOT_PHAN/HET_KY_CON_NGHIA_VU, nếu không `409 INVALID_STATUS` (KN01: không có chat) |
 | POST | `/api/v1/bookings/plans/{id}/reject` | TUTOR | `{reason}`, chỉ REQUESTED |
 | POST | `/api/v1/bookings/plans/{id}/cancel` | LEARNER chủ đơn | REQUESTED/PROPOSED, giải phóng lịch giữ |
 | GET | `/api/v1/bookings/sessions/me?from=&to=` | LEARNER/TUTOR | mặc định −7 đến +60 ngày |
 | GET | `/api/v1/bookings/sessions/{id}` | 2 bên hoặc ADMIN | |
 | PUT | `/api/v1/bookings/sessions/{id}/meet-link` | TUTOR | `{meetLink}` https, chỉ đổi buổi đó, báo Người thuê |
-| POST | `/api/v1/bookings/sessions/{id}/cancel` | 2 bên | `{reason}`; SCHEDULED → CANCEL_REPORTED, chờ dời lịch |
+| POST | `/api/v1/bookings/sessions/{id}/cancel` | 2 bên | `{reason}`; SCHEDULED → CANCEL_REPORTED, chờ dời lịch tới `cancelDeadline` = min(24h, giờ học); quá hạn → CANCELLED |
 | GET | `/api/v1/bookings/sessions/{id}/reschedule/free?fromDate=` | 2 bên | Ca chọn được trong 7 ngày từ `fromDate` (CANCEL_REPORTED). Học viên: giờ trống của gia sư. Gia sư: trong lịch học viên gửi |
 | POST | `/api/v1/bookings/sessions/{id}/reschedule` | 2 bên | `{startAt}` phải nằm trong danh sách trên; buổi → SCHEDULED giờ mới; 409 `SLOT_NOT_AVAILABLE`/`SCHEDULE_CONFLICT` |
 | POST | `/api/v1/bookings/sessions/{id}/reschedule/offer` | Học viên | `{fromDate, toDate, windows[]}` (tối đa 56 ngày); thay lịch đã gửi trước đó |
 | POST | `/api/v1/bookings/sessions/{id}/reschedule/decline` | Gia sư | `{reason}`; xóa lịch học viên gửi, báo học viên |
-| POST | `/api/v1/bookings/sessions/{id}/complete` | TUTOR | sau giờ bắt đầu → COMPLETED_PENDING_CONFIRM, hạn xác nhận 24h |
-| POST | `/api/v1/bookings/sessions/{id}/confirm` | LEARNER chủ đơn | → CONFIRMED; mọi buổi CONFIRMED thì kỳ COMPLETED |
-| POST | `/api/v1/bookings/sessions/{id}/dispute` | LEARNER chủ đơn | `{reason}` trong 24h → DISPUTED |
+| POST | `/api/v1/bookings/sessions/{id}/start` | TUTOR | SCHEDULED, từ giờ học − 15 phút đến hết giờ → IN_PROGRESS; `startedAt` = giờ máy chủ, không sửa; muộn > 10 phút ghi `lateMinutes` (chưa thông báo/phạt) |
+| POST | `/api/v1/bookings/sessions/{id}/complete` | TUTOR | IN_PROGRESS → COMPLETED_PENDING_CONFIRM, hạn xác nhận 24h. Trước giờ kết thúc phải gửi `{earlyEndBy: LEARNER/TUTOR, earlyEndNote}` (`400 EARLY_END_NOTE_REQUIRED`) |
+| POST | `/api/v1/bookings/sessions/{id}/learner-absent` | TUTOR | `{reason}`; IN_PROGRESS, sau giờ học + 15 phút → LEARNER_ABSENT_PENDING, học sinh có 24h phản đối |
+| POST | `/api/v1/bookings/sessions/{id}/tutor-absent` | LEARNER chủ đơn | `{reason}`; SCHEDULED (gia sư chưa bắt đầu), sau giờ học + 15 phút → TUTOR_ABSENT_REPORTED, chờ module vụ việc |
+| POST | `/api/v1/bookings/sessions/{id}/confirm` | LEARNER chủ đơn | COMPLETED_PENDING_CONFIRM → CONFIRMED; LEARNER_ABSENT_PENDING → LEARNER_ABSENT. Sau đó xét đóng kỳ |
+| POST | `/api/v1/bookings/sessions/{id}/dispute` | LEARNER chủ đơn | `{reason}` trong 24h (chờ xác nhận hoặc báo vắng) → DISPUTED |
 | GET | `/api/v1/bookings/admin/plans?status=` | ADMIN | 100 kế hoạch mới nhất |
 | GET | `/api/v1/bookings/internal/availability/tutors` | SERVICE | dùng cho lọc lịch khi tìm kiếm |
 | GET | `/api/v1/bookings/internal/plans/{id}/review-eligibility` | SERVICE | dùng cho nhận xét |
 
-Job mỗi 60 giây: kế hoạch PROPOSED quá hạn giữ → EXPIRED (buổi HELD → RELEASED); buổi chờ xác nhận quá 24h → CONFIRMED (`autoConfirmed`), không áp dụng cho buổi DISPUTED/CANCEL_REPORTED. Chống trùng lịch cuối cùng bằng 2 EXCLUDE constraint PostgreSQL (gia sư: gồm 60 phút đệm; Người thuê: không chồng giờ).
+Job mỗi 60 giây: kế hoạch PROPOSED quá hạn giữ → EXPIRED (buổi HELD → RELEASED); buổi chờ xác nhận quá 24h và có `startedAt` → CONFIRMED (`autoConfirmed`); LEARNER_ABSENT_PENDING quá hạn → LEARNER_ABSENT; CANCEL_REPORTED quá `cancelDeadline` → CANCELLED; đề nghị đổi giờ quá hạn → EXPIRED; nhắc buổi học trước 60 và 30 phút; nhắc gia hạn khi kỳ CONFIRMED còn ≤ 14 ngày.
+
+Đóng kỳ (sau mỗi thay đổi trạng thái buổi): mọi buổi CONFIRMED/LEARNER_ABSENT/CANCELLED → HOAN_TAT_NGHIA_VU, hoặc KET_THUC_CO_HOAN_MOT_PHAN nếu có buổi CANCELLED do gia sư báo; còn buổi DISPUTED/TUTOR_ABSENT_REPORTED khi các buổi khác đã xong → HET_KY_CON_NGHIA_VU (chưa mở nhận xét). Nhận xét mở cho hai trạng thái đóng đầu, 14 ngày từ `closedAt`. Chống trùng lịch cuối cùng bằng 2 EXCLUDE constraint PostgreSQL (gia sư: gồm 60 phút đệm; Người thuê: không chồng giờ).
 
 ## Notification
 

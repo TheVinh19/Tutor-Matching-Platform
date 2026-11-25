@@ -18,7 +18,7 @@ import vn.giasu.booking.plans.Plans.Plan;
 class ContactController {
     record PlanContact(String learnerPhone, String tutorPhone) {}
 
-    private static final Set<String> SHARED = Set.of("CONFIRMED", "COMPLETED");
+    private static final Set<String> SHARED = Set.of("CONFIRMED", "HOAN_TAT_NGHIA_VU", "KET_THUC_CO_HOAN_MOT_PHAN", "HET_KY_CON_NGHIA_VU");
 
     private final Plans plans;
     private final IdentityClient identity;

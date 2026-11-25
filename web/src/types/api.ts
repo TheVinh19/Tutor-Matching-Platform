@@ -23,7 +23,8 @@ export type Slot = {
   effectiveFrom: string; effectiveTo: string | null;
 };
 
-export type PlanStatus = "REQUESTED" | "PROPOSED" | "CONFIRMED" | "COMPLETED" | "REJECTED" | "CANCELLED" | "EXPIRED";
+export type PlanStatus = "REQUESTED" | "PROPOSED" | "CONFIRMED" | "HOAN_TAT_NGHIA_VU" | "KET_THUC_CO_HOAN_MOT_PHAN" | "HET_KY_CON_NGHIA_VU"
+  | "REJECTED" | "CANCELLED" | "EXPIRED";
 export type Plan = {
   id: string; learnerId: string; tutorId: string; subjectCode: string; levelCode: string; mode: "ONLINE" | "OFFLINE";
   note: string; status: PlanStatus; paymentStatus: string | null; rejectReason: string | null;
@@ -31,18 +32,30 @@ export type Plan = {
   createdAt: string; proposedAt: string | null; confirmedAt: string | null; closedAt: string | null;
   /** Grid flow; null on older free-text requests. */
   sessionsPerWeek: number | null; weeks: number | null;
+  /** Renewal: the period this one continues; renewalQualifiedAt is set once the old period completed and this one is paid. */
+  renewedFrom: string | null; renewalQualifiedAt: string | null;
 };
-export type SessionStatus = "HELD" | "SCHEDULED" | "CANCEL_REPORTED" | "COMPLETED_PENDING_CONFIRM" | "CONFIRMED" | "DISPUTED" | "CANCELLED" | "RELEASED";
+export type SessionStatus = "HELD" | "SCHEDULED" | "IN_PROGRESS" | "CANCEL_REPORTED" | "COMPLETED_PENDING_CONFIRM" | "CONFIRMED" | "DISPUTED"
+  | "LEARNER_ABSENT_PENDING" | "LEARNER_ABSENT" | "TUTOR_ABSENT_REPORTED" | "CANCELLED" | "RELEASED";
 export type Session = {
   id: string; planId: string; tutorId: string; learnerId: string; startAt: string; endAt: string; status: SessionStatus;
   meetLink: string | null; cancelReason: string | null; cancelledBy: string | null; cancelledAt: string | null;
   completedAt: string | null; confirmDeadline: string | null; confirmedAt: string | null; autoConfirmed: boolean; disputeReason: string | null;
   /** Date range of the learner's "can attend" offer on a CANCEL_REPORTED session, waiting for the tutor to pick a slot. */
   offerFrom: string | null; offerTo: string | null;
+  /** Server time the tutor pressed "start"; lateMinutes only when more than 10 minutes late. */
+  startedAt: string | null; lateMinutes: number | null;
+  earlyEndBy: "LEARNER" | "TUTOR" | null; earlyEndNote: string | null;
+  absentNote: string | null; absentDeadline: string | null; cancelDeadline: string | null;
 };
 export type WeekCell = { dayOfWeek: number; startTime: string };
 export type WeekWindow = { dayOfWeek: number; startTime: string; endTime: string };
-export type PlanDetail = { plan: Plan; sessions: Session[]; preferredSlots: WeekCell[] };
+export type SlotChange = {
+  id: string; planId: string; requestedBy: string; fromDay: number; fromTime: string; toDay: number; toTime: string;
+  effectiveFrom: string; status: "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED" | "CANCELLED"; declineReason: string | null;
+  expiresAt: string; createdAt: string; decidedAt: string | null;
+};
+export type PlanDetail = { plan: Plan; sessions: Session[]; preferredSlots: WeekCell[]; pendingSlotChange: SlotChange | null };
 export type PlanContact = { learnerPhone: string | null; tutorPhone: string | null };
 export type Me = { accountId: string; username: string | null; email: string | null; phone: string | null; role: string; status: string };
 
