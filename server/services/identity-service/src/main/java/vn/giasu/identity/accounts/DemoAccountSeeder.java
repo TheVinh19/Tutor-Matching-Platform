@@ -22,14 +22,14 @@ import vn.giasu.identity.accounts.Account.Role;
 class DemoAccountSeeder implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(DemoAccountSeeder.class);
 
-    record DemoAccount(UUID id, String email, Role role) {}
+    record DemoAccount(UUID id, String email, Role role, String phone) {}
 
     static final List<DemoAccount> ACCOUNTS = List.of(
-            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000001"), "admin@demo.giasu.vn", Role.ADMIN),
-            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000002"), "tutor1@demo.giasu.vn", Role.TUTOR),
-            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000003"), "tutor2@demo.giasu.vn", Role.TUTOR),
-            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000004"), "learner1@demo.giasu.vn", Role.LEARNER),
-            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000005"), "learner2@demo.giasu.vn", Role.LEARNER));
+            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000001"), "admin@demo.giasu.vn", Role.ADMIN, null),
+            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000002"), "tutor1@demo.giasu.vn", Role.TUTOR, "0901000002"),
+            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000003"), "tutor2@demo.giasu.vn", Role.TUTOR, "0901000003"),
+            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000004"), "learner1@demo.giasu.vn", Role.LEARNER, "0901000004"),
+            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000005"), "learner2@demo.giasu.vn", Role.LEARNER, "0901000005"));
 
     private final AccountRepository accounts;
     private final PasswordEncoder encoder;
@@ -47,7 +47,11 @@ class DemoAccountSeeder implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         // save() merges by id: inserts on first run, refreshes the hash if DEMO_PASSWORD changed.
-        ACCOUNTS.forEach(a -> accounts.save(new Account(a.id(), a.email(), encoder.encode(password), a.role())));
+        ACCOUNTS.forEach(a -> {
+            Account account = new Account(a.id(), a.email(), encoder.encode(password), a.role());
+            account.setPhone(a.phone());
+            accounts.save(account);
+        });
         log.info("Demo accounts ready: {}", ACCOUNTS.size());
     }
 }

@@ -50,7 +50,7 @@ Lần đầu cần tải image/dependency và chờ khởi động. Stack nhiề
 
 ## Chạy từ IDE hoặc terminal
 
-Cần Java 21, Maven 3.9+, Node.js 24 LTS (repo cũng chấp nhận Node 25). Bật hạ tầng trước, mỗi app một PowerShell riêng:
+Cần Java 25 (LTS), Maven 3.9+, Node.js 24 LTS (repo cũng chấp nhận Node 25). Bật hạ tầng trước, mỗi app một PowerShell riêng:
 
 ```powershell
 $env:DB_PASSWORD = 'local_account_change_me' # Khớp ACCOUNT_DB_PASSWORD trong .env

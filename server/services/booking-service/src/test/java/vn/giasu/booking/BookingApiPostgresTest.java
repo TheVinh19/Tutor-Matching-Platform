@@ -63,6 +63,7 @@ class BookingApiPostgresTest {
     @Autowired HoldJobs jobs;
     @MockitoBean TutorClient tutors;
     @MockitoBean Notifier notifier;
+    @MockitoBean IdentityClient identity;
     MockMvc mvc;
 
     /** Monday at least a week away, so the first session is always > 12h ahead. */
@@ -209,6 +210,9 @@ class BookingApiPostgresTest {
                 .andExpect(jsonPath("$.sessions", hasSize(4)))
                 .andExpect(jsonPath("$.sessions[*].status", everyItem(is("HELD"))));
 
+        // KN01: phones stay hidden until the plan is confirmed.
+        String contactUrl = "/api/v1/bookings/plans/" + plan + "/contact";
+        call(get(contactUrl), learner, "LEARNER", null).andExpect(status().isConflict());
         call(post("/api/v1/bookings/plans/" + plan + "/confirm"), UUID.randomUUID(), "LEARNER", null)
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("NOT_PLAN_OWNER"));
         call(post("/api/v1/bookings/plans/" + plan + "/confirm"), tutor, "TUTOR", null).andExpect(status().isForbidden());
@@ -217,6 +221,11 @@ class BookingApiPostgresTest {
                 .andExpect(jsonPath("$.plan.paymentStatus").value("PAYMENT_PENDING_MOCK"))
                 .andExpect(jsonPath("$.sessions[*].status", everyItem(is("SCHEDULED"))))
                 .andExpect(jsonPath("$.sessions[0].meetLink").value("https://meet.google.com/abc"));
+        when(identity.phone(learner)).thenReturn("0901000004");
+        when(identity.phone(tutor)).thenReturn("0901000002");
+        call(get(contactUrl), tutor, "TUTOR", null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.learnerPhone").value("0901000004")).andExpect(jsonPath("$.tutorPhone").value("0901000002"));
+        call(get(contactUrl), UUID.randomUUID(), "LEARNER", null).andExpect(status().isForbidden());
 
         List<UUID> sessions = jdbc.sql("SELECT id FROM sessions WHERE plan_id = ? ORDER BY start_at").param(plan).query(UUID.class).list();
         UUID first = sessions.get(0);

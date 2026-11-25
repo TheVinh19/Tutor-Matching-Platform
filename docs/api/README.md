@@ -17,7 +17,9 @@ Mọi API đi qua gateway `:8080` (hoặc Nginx `:8088`), prefix `/api/v1/<khu>`
 | Method | Path | Quyền | Ghi chú |
 |---|---|---|---|
 | POST | `/api/v1/identity/auth/login` | công khai | `{email,password}` → `{accessToken,tokenType,expiresIn,role,accountId}`. Sai email/mật khẩu cùng trả `401 INVALID_CREDENTIALS` |
-| GET | `/api/v1/identity/me` | đã đăng nhập | `{accountId,email,role,status}` |
+| GET | `/api/v1/identity/me` | đã đăng nhập | `{accountId,username,email,phone,role,status}` |
+| PUT | `/api/v1/identity/me/phone` | đã đăng nhập | `{phone}` 10 số, bắt đầu bằng 0; chưa xác minh OTP |
+| GET | `/api/v1/identity/internal/accounts/{id}/contact` | SERVICE | `{accountId,phone}` cho booking |
 | GET | `/api/v1/identity/admin/accounts` | ADMIN | danh sách tài khoản |
 
 Đăng nhập mock: chưa có đăng ký/xác minh email. Tài khoản demo xem README gốc.
@@ -54,6 +56,7 @@ Mọi API đi qua gateway `:8080` (hoặc Nginx `:8088`), prefix `/api/v1/<khu>`
 | GET | `/api/v1/bookings/plans/{id}` | 2 bên hoặc ADMIN | kế hoạch + buổi + `preferredSlots` |
 | POST | `/api/v1/bookings/plans/{id}/propose` | TUTOR của kế hoạch | Kế hoạch có lưới: `slots` phải là đúng các buổi trong `preferredSlots` (giao diện gửi nguyên các buổi học sinh chọn) (`WRONG_SLOT_COUNT`, `NOT_PREFERRED_SLOT`), ngày lấy theo học sinh, buổi còn dưới 12 giờ bị bỏ. Kế hoạch cũ: `{startDate,endDate?,slots:[{dayOfWeek,startTime}],meetLink?}`; mặc định 4 tuần, ca 120 phút, cách ca ≥60 phút, trong lịch rảnh; buổi đầu >12 giờ. Sinh buổi HELD, giữ tới min(24h, buổi đầu − 12h). Trùng → `409 SCHEDULE_CONFLICT` (`details` = buổi xung đột) |
 | POST | `/api/v1/bookings/plans/{id}/confirm` | LEARNER chủ đơn | PROPOSED → CONFIRMED, `paymentStatus=PAYMENT_PENDING_MOCK` (mục 4 thay bằng thanh toán). Hết hạn giữ → `409 HOLD_EXPIRED` |
+| GET | `/api/v1/bookings/plans/{id}/contact` | 2 bên hoặc ADMIN | `{learnerPhone,tutorPhone}`, chỉ khi CONFIRMED/COMPLETED, nếu không `409 INVALID_STATUS` (KN01: không có chat) |
 | POST | `/api/v1/bookings/plans/{id}/reject` | TUTOR | `{reason}`, chỉ REQUESTED |
 | POST | `/api/v1/bookings/plans/{id}/cancel` | LEARNER chủ đơn | REQUESTED/PROPOSED, giải phóng lịch giữ |
 | GET | `/api/v1/bookings/sessions/me?from=&to=` | LEARNER/TUTOR | mặc định −7 đến +60 ngày |

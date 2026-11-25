@@ -13,7 +13,7 @@ import { useLoad } from "@/hooks/use-load";
 import { api, fmtDate, fmtDateTime } from "@/lib/api";
 import { SessionCard } from "@/features/booking/session-card";
 import { useCatalog } from "@/features/tutors/catalog";
-import type { PlanDetail, WeekWindow } from "@/types/api";
+import type { Me, PlanContact, PlanDetail, WeekWindow } from "@/types/api";
 
 type Role = "LEARNER" | "TUTOR";
 
@@ -82,6 +82,7 @@ export function PlanView({ id, role }: { id: string; role: Role }) {
           {role === "LEARNER" && (plan.status === "REQUESTED" || plan.status === "PROPOSED") && (
             <Button variant="outline" disabled={action.pending} onClick={() => post("cancel")}>Hủy yêu cầu</Button>
           )}
+          {(plan.status === "CONFIRMED" || plan.status === "COMPLETED") && <ContactCard planId={plan.id} role={role} />}
           {role === "LEARNER" && plan.status === "COMPLETED" && <ReviewForm planId={plan.id} closedAt={plan.closedAt} />}
           {role === "TUTOR" && plan.status === "REQUESTED" && (
             <>
@@ -92,6 +93,44 @@ export function PlanView({ id, role }: { id: string; role: Role }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** KN01: no in-app chat; the parties call or text each other once the plan is confirmed. */
+function ContactCard({ planId, role }: { planId: string; role: Role }) {
+  const { data: contact, error, reload } = useLoad<PlanContact>(`/v1/bookings/plans/${planId}/contact`);
+  const { data: me, reload: reloadMe } = useLoad<Me>("/v1/identity/me");
+  const [phone, setPhone] = useState("");
+  const save = useAction();
+  const other = role === "TUTOR" ? contact?.learnerPhone : contact?.tutorPhone;
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Liên hệ</CardTitle></CardHeader>
+      <CardContent className="grid gap-3 text-sm">
+        <ErrorBox error={error} />
+        {contact && (
+          <p>
+            <span className="font-medium">{role === "TUTOR" ? "SĐT người thuê" : "SĐT gia sư"}:</span>{" "}
+            {other ? <a className="text-primary hover:underline" href={`tel:${other}`}>{other}</a> : <span className="text-muted-foreground">chưa cập nhật</span>}
+          </p>
+        )}
+        {me && !me.phone && (
+          <form className="grid gap-1.5" onSubmit={(e) => {
+            e.preventDefault();
+            void save.run(async () => { await api("/v1/identity/me/phone", { method: "PUT", body: { phone } }); await Promise.all([reloadMe(), reload()]); });
+          }}>
+            <Label htmlFor="my-phone">SĐT của bạn (để bên kia liên hệ)</Label>
+            <div className="flex gap-2">
+              <Input id="my-phone" inputMode="tel" required pattern="0[0-9]{9}" title="10 chữ số, bắt đầu bằng 0" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <Button type="submit" disabled={save.pending}>Lưu</Button>
+            </div>
+            <ErrorBox error={save.error} />
+          </form>
+        )}
+        <p className="text-muted-foreground">Nếu có khiếu nại, hãy lưu lại ảnh chụp tin nhắn trao đổi để làm bằng chứng.</p>
+      </CardContent>
+    </Card>
   );
 }
 

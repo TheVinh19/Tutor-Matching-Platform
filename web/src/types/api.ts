@@ -43,5 +43,7 @@ export type Session = {
 export type WeekCell = { dayOfWeek: number; startTime: string };
 export type WeekWindow = { dayOfWeek: number; startTime: string; endTime: string };
 export type PlanDetail = { plan: Plan; sessions: Session[]; preferredSlots: WeekCell[] };
+export type PlanContact = { learnerPhone: string | null; tutorPhone: string | null };
+export type Me = { accountId: string; username: string | null; email: string | null; phone: string | null; role: string; status: string };
 
 export type Notice = { id: string; type: string; title: string; body: string; refType: string | null; refId: string | null; createdAt: string; readAt: string | null };
