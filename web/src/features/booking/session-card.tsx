@@ -28,7 +28,7 @@ export function SessionCard({ session: s, role, onChange }: { session: Session; 
   const now = Date.now();
   const startMs = new Date(s.startAt).getTime();
   const endMs = new Date(s.endAt).getTime();
-  const canStart = now >= startMs - 15 * MINUTE && now <= endMs;
+  const canStart = now >= startMs - 15 * MINUTE;
   // Absence of the other party can be reported 15 minutes after the planned start (P11).
   const waited = now >= startMs + 15 * MINUTE;
 
@@ -68,7 +68,7 @@ export function SessionCard({ session: s, role, onChange }: { session: Session; 
 
       <div className="flex flex-wrap gap-2">
         {role === "TUTOR" && s.status === "SCHEDULED" && (
-          <Button size="sm" disabled={pending || !canStart} title={canStart ? undefined : "Bấm được từ 15 phút trước giờ học đến hết giờ"} onClick={() => post("start")}>
+          <Button size="sm" disabled={pending || !canStart} title={canStart ? undefined : "Bấm được từ 15 phút trước giờ học"} onClick={() => post("start")}>
             Bắt đầu buổi học
           </Button>
         )}

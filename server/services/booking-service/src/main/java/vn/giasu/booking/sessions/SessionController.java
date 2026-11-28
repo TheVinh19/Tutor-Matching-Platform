@@ -120,9 +120,7 @@ class SessionController {
         if (now.isBefore(s.startAt().minus(Schedule.START_EARLY))) {
             throw new ApiException(HttpStatus.CONFLICT, "SESSION_NOT_STARTED", "Chỉ bắt đầu được từ 15 phút trước giờ học");
         }
-        if (now.isAfter(s.endAt())) {
-            throw new ApiException(HttpStatus.CONFLICT, "SESSION_ENDED", "Đã quá giờ kết thúc dự kiến");
-        }
+        // No upper bound: starting after the planned end is still allowed, it is just recorded as late.
         long late = Duration.between(s.startAt(), now).toMinutes();
         Integer lateMinutes = late > Schedule.LATE_GRACE.toMinutes() ? (int) late : null;
         jdbc.sql("UPDATE sessions SET status = 'IN_PROGRESS', started_at = now(), late_minutes = ?, updated_at = now() WHERE id = ?")

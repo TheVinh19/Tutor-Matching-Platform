@@ -484,6 +484,10 @@ class BookingApiPostgresTest {
         call(post(url + "/start"), tutor, "TUTOR", null).andExpect(jsonPath("$.status").value("IN_PROGRESS"))
                 .andExpect(jsonPath("$.startedAt").isNotEmpty()).andExpect(jsonPath("$.lateMinutes", org.hamcrest.Matchers.greaterThan(10)));
         call(post(url + "/start"), tutor, "TUTOR", null).andExpect(status().isConflict()); // once only
+        // Even after the planned end the tutor can still start; it is only recorded as late.
+        startsIn(s.get(2), "-1 day");
+        call(post("/api/v1/bookings/sessions/" + s.get(2) + "/start"), tutor, "TUTOR", null)
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS")).andExpect(jsonPath("$.lateMinutes", org.hamcrest.Matchers.greaterThan(1000)));
 
         call(post(url + "/complete"), tutor, "TUTOR", null)
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("EARLY_END_NOTE_REQUIRED"));

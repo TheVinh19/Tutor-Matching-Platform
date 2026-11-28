@@ -85,7 +85,7 @@ Duyệt hồ sơ `POST /api/v1/tutors/admin/profiles/{id}/approve` nhận thêm 
 | POST | `/api/v1/bookings/sessions/{id}/reschedule` | 2 bên | `{startAt}` phải nằm trong danh sách trên; buổi → SCHEDULED giờ mới; 409 `SLOT_NOT_AVAILABLE`/`SCHEDULE_CONFLICT` |
 | POST | `/api/v1/bookings/sessions/{id}/reschedule/offer` | Học viên | `{fromDate, toDate, windows[]}` (tối đa 56 ngày); thay lịch đã gửi trước đó |
 | POST | `/api/v1/bookings/sessions/{id}/reschedule/decline` | Gia sư | `{reason}`; xóa lịch học viên gửi, báo học viên |
-| POST | `/api/v1/bookings/sessions/{id}/start` | TUTOR | SCHEDULED, từ giờ học − 15 phút đến hết giờ → IN_PROGRESS; `startedAt` = giờ máy chủ, không sửa; muộn > 10 phút ghi `lateMinutes` (chưa thông báo/phạt) |
+| POST | `/api/v1/bookings/sessions/{id}/start` | TUTOR | SCHEDULED, từ giờ học − 15 phút (không giới hạn sau) → IN_PROGRESS; `startedAt` = giờ máy chủ, không sửa; muộn > 10 phút ghi `lateMinutes` (chưa thông báo/phạt) |
 | POST | `/api/v1/bookings/sessions/{id}/complete` | TUTOR | IN_PROGRESS → COMPLETED_PENDING_CONFIRM, hạn xác nhận 24h. Trước giờ kết thúc phải gửi `{earlyEndBy: LEARNER/TUTOR, earlyEndNote}` (`400 EARLY_END_NOTE_REQUIRED`) |
 | POST | `/api/v1/bookings/sessions/{id}/learner-absent` | TUTOR | `{reason}`; IN_PROGRESS, sau giờ học + 15 phút → LEARNER_ABSENT_PENDING, học sinh có 24h phản đối |
 | POST | `/api/v1/bookings/sessions/{id}/tutor-absent` | LEARNER chủ đơn | `{reason}`; SCHEDULED (gia sư chưa bắt đầu), sau giờ học + 15 phút → TUTOR_ABSENT_REPORTED, chờ module vụ việc |
