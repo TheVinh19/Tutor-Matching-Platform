@@ -36,7 +36,7 @@ class DemoAccountsPostgresTest {
                 .addFilters(context.getBean("springSecurityFilterChain", jakarta.servlet.Filter.class)).build();
         String[][] expected = {
             {"admin@demo.giasu.vn", "ADMIN"}, {"tutor1@demo.giasu.vn", "TUTOR"}, {"tutor2@demo.giasu.vn", "TUTOR"},
-            {"learner1@demo.giasu.vn", "LEARNER"}, {"learner2@demo.giasu.vn", "LEARNER"}};
+            {"learner1@demo.giasu.vn", "LEARNER"}, {"learner2@demo.giasu.vn", "LEARNER"}, {"support@demo.giasu.vn", "SUPPORT"}};
         for (String[] account : expected) {
             mvc.perform(post("/api/v1/identity/auth/login").contentType(MediaType.APPLICATION_JSON)
                             .content("{\"login\":\"" + account[0] + "\",\"password\":\"Demo-pass-123\"}"))
@@ -78,5 +78,34 @@ class DemoAccountsPostgresTest {
         // Users never read someone else's phone directly; only booking-service (role SERVICE) may.
         mvc.perform(get("/api/v1/identity/internal/accounts/00000000-0000-0000-0000-000000000002/contact").header("Authorization", bearer))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminCreatesSupportAccountAndSignUpCannotPickIt() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(context)
+                .addFilters(context.getBean("springSecurityFilterChain", jakarta.servlet.Filter.class)).build();
+        String admin = "Bearer " + com.jayway.jsonpath.JsonPath.read(mvc.perform(post("/api/v1/identity/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"login\":\"admin@demo.giasu.vn\",\"password\":\"Demo-pass-123\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.accessToken");
+        String learner = "Bearer " + com.jayway.jsonpath.JsonPath.read(mvc.perform(post("/api/v1/identity/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"login\":\"learner1@demo.giasu.vn\",\"password\":\"Demo-pass-123\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.accessToken");
+        String body = "{\"username\":\"cskh.lan\",\"password\":\"matkhau123\"}";
+        mvc.perform(post("/api/v1/identity/admin/accounts/support").header("Authorization", learner)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/identity/admin/accounts/support").header("Authorization", admin)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.role").value("SUPPORT"));
+        mvc.perform(post("/api/v1/identity/admin/accounts/support").header("Authorization", admin)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("USERNAME_TAKEN"));
+        mvc.perform(post("/api/v1/identity/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"login\":\"cskh.lan\",\"password\":\"matkhau123\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.role").value("SUPPORT"));
+        // Public sign-up only offers LEARNER or TUTOR.
+        mvc.perform(post("/api/v1/identity/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"tu.xung\",\"password\":\"matkhau123\",\"role\":\"SUPPORT\"}"))
+                .andExpect(status().isBadRequest());
     }
 }

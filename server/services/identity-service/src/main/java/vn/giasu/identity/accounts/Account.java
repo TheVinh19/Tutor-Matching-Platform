@@ -12,7 +12,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "accounts")
 public class Account {
-    public enum Role { LEARNER, TUTOR, ADMIN }
+    /** SUPPORT: customer care staff (P18), created by an admin, never through public sign-up. */
+    public enum Role { LEARNER, TUTOR, ADMIN, SUPPORT }
     public enum Status { ACTIVE, RESTRICTED }
 
     @Id

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import vn.giasu.booking.IdentityClient;
 import vn.giasu.booking.Notifier;
 import vn.giasu.booking.plans.Plans;
 import vn.giasu.common.web.ApiException;
@@ -38,10 +39,17 @@ class CaseController {
 
     record Case(UUID id, UUID sessionId, UUID planId, UUID learnerId, UUID tutorId, String kind, String status, String reason,
                 OffsetDateTime evidenceDeadline, String outcome, String decisionReason, UUID decidedBy, OffsetDateTime decidedAt,
-                OffsetDateTime createdAt, OffsetDateTime updatedAt) {}
+                OffsetDateTime createdAt, OffsetDateTime updatedAt,
+                String proposedOutcome, String proposalReason, UUID proposedBy, OffsetDateTime proposedAt) {}
     record Evidence(long id, UUID submittedBy, String party, String url, String note, OffsetDateTime createdAt) {}
     record Event(String action, UUID actorId, String note, OffsetDateTime createdAt) {}
-    record Detail(Case caseInfo, Plans.Session session, List<Evidence> evidence, List<Event> events, String suggestedOutcome) {}
+    record Contact(long id, UUID actorId, String party, String channel, boolean reached, String note, OffsetDateTime createdAt) {}
+    record Detail(Case caseInfo, Plans.Session session, List<Evidence> evidence, List<Event> events, String suggestedOutcome,
+                  List<Contact> contacts) {}
+    enum Party { LEARNER, TUTOR }
+    enum Channel { PHONE, MESSAGE, EMAIL, OTHER }
+    record ContactRequest(@NotNull Party party, @NotNull Channel channel, @NotNull Boolean reached, @NotBlank @Size(max = 2000) String note) {}
+    record PhoneView(String party, String phone) {}
     record EvidenceRequest(@NotNull @Size(min = 1, max = 5) List<@NotBlank @Size(max = 500) @Pattern(regexp = "https://\\S+", message = "phải là link https") String> urls,
                            @Size(max = 1000) String note) {}
     record DecideRequest(@NotNull Outcome outcome, @NotBlank @Size(max = 2000) String reason) {}
@@ -53,18 +61,27 @@ class CaseController {
 
     private static final String SELECT = """
             SELECT id, session_id, plan_id, learner_id, tutor_id, kind, status, reason, evidence_deadline, outcome, decision_reason,
-                   decided_by, decided_at, created_at, updated_at FROM cases""";
+                   decided_by, decided_at, created_at, updated_at, proposed_outcome, proposal_reason, proposed_by, proposed_at FROM cases""";
 
     private final JdbcClient jdbc;
     private final Plans plans;
     private final Cases cases;
     private final Notifier notifier;
+    private final IdentityClient identity;
 
-    CaseController(JdbcClient jdbc, Plans plans, Cases cases, Notifier notifier) {
+    CaseController(JdbcClient jdbc, Plans plans, Cases cases, Notifier notifier, IdentityClient identity) {
         this.jdbc = jdbc;
         this.plans = plans;
         this.cases = cases;
         this.notifier = notifier;
+        this.identity = identity;
+    }
+
+    /** P18: customer care staff read every case to take it in; they never decide it. */
+    static boolean isSupport(Jwt jwt) { return "SUPPORT".equals(jwt.getClaimAsString("role")); }
+
+    private static void requireCaseReader(Jwt jwt, Case c) {
+        if (!isSupport(jwt)) Plans.requireParticipantOrAdmin(jwt, c.learnerId(), c.tutorId());
     }
 
     @GetMapping("/api/v1/bookings/cases/me")
@@ -77,7 +94,7 @@ class CaseController {
     @GetMapping("/api/v1/bookings/cases/{id}")
     Detail detail(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         Case c = get(id, false);
-        Plans.requireParticipantOrAdmin(jwt, c.learnerId(), c.tutorId());
+        requireCaseReader(jwt, c);
         return detailOf(c);
     }
 
@@ -86,7 +103,7 @@ class CaseController {
     Detail ofSession(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID sessionId) {
         Case c = jdbc.sql(SELECT + " WHERE session_id = ?").param(sessionId).query(Case.class).optional()
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "CASE_NOT_FOUND", "Buổi này chưa có vụ việc"));
-        Plans.requireParticipantOrAdmin(jwt, c.learnerId(), c.tutorId());
+        requireCaseReader(jwt, c);
         return detailOf(c);
     }
 
@@ -126,10 +143,51 @@ class CaseController {
     }
 
     @GetMapping("/api/v1/bookings/admin/cases")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPPORT')")
     List<Case> adminList(@RequestParam(required = false) String status) {
         return jdbc.sql(SELECT + " WHERE cast(:status AS varchar) IS NULL OR status = :status ORDER BY updated_at DESC LIMIT 100")
                 .param("status", status).query(Case.class).list();
+    }
+
+    /** P18/P11: staff log each call or message to a party (a silent tutor needs at least 2 attempts within 24h). */
+    @PostMapping("/api/v1/bookings/support/cases/{id}/contacts")
+    @PreAuthorize("hasRole('SUPPORT')")
+    @Transactional
+    Detail logContact(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody ContactRequest r) {
+        get(id, true);
+        jdbc.sql("INSERT INTO case_contacts (case_id, actor_id, party, channel, reached, note) VALUES (?, ?, ?, ?, ?, ?)")
+                .params(id, Plans.caller(jwt), r.party().name(), r.channel().name(), r.reached(), r.note().strip()).update();
+        jdbc.sql("UPDATE cases SET updated_at = now() WHERE id = ?").param(id).update();
+        return detailOf(get(id, false));
+    }
+
+    /** Option B: staff propose; the admin's decision (below) stays the only thing that changes the session. */
+    @PostMapping("/api/v1/bookings/support/cases/{id}/proposal")
+    @PreAuthorize("hasRole('SUPPORT')")
+    @Transactional
+    Detail propose(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody DecideRequest r) {
+        Case c = get(id, true);
+        Plans.requireStatus(!"DECIDED".equals(c.status()), "Vụ việc đã có kết luận");
+        UUID me = Plans.caller(jwt);
+        String reason = r.reason().strip();
+        jdbc.sql("""
+                UPDATE cases SET proposed_outcome = ?, proposal_reason = ?, proposed_by = ?, proposed_at = now(), updated_at = now()
+                WHERE id = ?""").params(r.outcome().name(), reason, me, id).update();
+        jdbc.sql("INSERT INTO case_events (case_id, action, actor_id, note) VALUES (?, 'PROPOSED', ?, ?)")
+                .params(id, me, r.outcome().name() + ": " + reason).update();
+        return detailOf(get(id, false));
+    }
+
+    /** Phone of one party of an undecided case, for staff to call; every read is logged (P18). */
+    @GetMapping("/api/v1/bookings/support/cases/{id}/phone")
+    @PreAuthorize("hasRole('SUPPORT')")
+    @Transactional
+    PhoneView phone(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @RequestParam Party party) {
+        Case c = get(id, false);
+        Plans.requireStatus(!"DECIDED".equals(c.status()), "Chỉ xem liên hệ khi vụ việc đang xử lý");
+        UUID account = party == Party.TUTOR ? c.tutorId() : c.learnerId();
+        jdbc.sql("INSERT INTO contact_views (actor_id, account_id, case_id) VALUES (?, ?, ?)").params(Plans.caller(jwt), account, id).update();
+        return new PhoneView(party.name(), identity.phone(account));
     }
 
     /** The session follows the outcome; a re-decision after appeal reverses the previous one (strike revoked, session updated). */
@@ -204,7 +262,9 @@ class CaseController {
         boolean noTutorEvidence = evidence.stream().noneMatch(e -> "TUTOR".equals(e.party()));
         String suggested = !"DECIDED".equals(c.status()) && noTutorEvidence && OffsetDateTime.now(ZoneOffset.UTC).isAfter(c.evidenceDeadline())
                 ? Outcome.TUTOR_FAULT.name() : null;
-        return new Detail(c, plans.session(c.sessionId(), false), evidence, events, suggested);
+        List<Contact> contacts = jdbc.sql("SELECT id, actor_id, party, channel, reached, note, created_at FROM case_contacts WHERE case_id = ? ORDER BY id")
+                .param(c.id()).query(Contact.class).list();
+        return new Detail(c, plans.session(c.sessionId(), false), evidence, events, suggested, contacts);
     }
 
     private Case get(UUID id, boolean forUpdate) {

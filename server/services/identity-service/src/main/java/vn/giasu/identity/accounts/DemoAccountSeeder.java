@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import vn.giasu.identity.accounts.Account.Role;
 
 /**
- * Mock login (mục 3): upserts 5 demo accounts when env DEMO_PASSWORD is set; no seeding otherwise.
+ * Mock login (mục 3): upserts the demo accounts (5 users + 1 CSKH) when env DEMO_PASSWORD is set; no seeding otherwise.
  * Fixed UUIDs so tutor/booking seed data can reference the same accounts.
  * shortcut: no registration/email verification yet, replace with real sign-up when that task lands.
  */
@@ -29,7 +29,8 @@ class DemoAccountSeeder implements ApplicationRunner {
             new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000002"), "tutor1@demo.giasu.vn", Role.TUTOR, "0901000002"),
             new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000003"), "tutor2@demo.giasu.vn", Role.TUTOR, "0901000003"),
             new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000004"), "learner1@demo.giasu.vn", Role.LEARNER, "0901000004"),
-            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000005"), "learner2@demo.giasu.vn", Role.LEARNER, "0901000005"));
+            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000005"), "learner2@demo.giasu.vn", Role.LEARNER, "0901000005"),
+            new DemoAccount(UUID.fromString("00000000-0000-0000-0000-000000000006"), "support@demo.giasu.vn", Role.SUPPORT, null));
 
     private final AccountRepository accounts;
     private final PasswordEncoder encoder;

@@ -816,4 +816,93 @@ class BookingApiPostgresTest {
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("RANK_UNDER_REVIEW"));
         propose(tutor, pending, "08:00").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("RANK_UNDER_REVIEW"));
     }
+
+    // ---- P18 customer care staff (SUPPORT) and internal facts for the new services ----
+
+    @Test
+    void supportTakesInCasesAndProposesButOnlyAdminDecides() throws Exception {
+        UUID tutor = UUID.randomUUID();
+        UUID learner = UUID.randomUUID();
+        UUID support = UUID.randomUUID();
+        UUID admin = UUID.randomUUID();
+        List<UUID> s = confirmedSessions(learner, tutor);
+        startsIn(s.get(1), "-1 day -20 minutes");
+        call(post("/api/v1/bookings/sessions/" + s.get(1) + "/tutor-absent"), learner, "LEARNER", "{\"reason\":\"Không vào lớp\"}").andExpect(status().isOk());
+        String c = caseIdOf(s.get(1));
+
+        call(get("/api/v1/bookings/admin/cases?status=OPEN"), support, "SUPPORT", null).andExpect(jsonPath("$[*].id", hasItem(c)));
+        call(get("/api/v1/bookings/cases/" + c), support, "SUPPORT", null).andExpect(jsonPath("$.caseInfo.kind").value("TUTOR_ABSENT"));
+        String contacts = "/api/v1/bookings/support/cases/" + c + "/contacts";
+        String call1 = "{\"party\":\"TUTOR\",\"channel\":\"PHONE\",\"reached\":false,\"note\":\"Gọi lần 1 không nghe\"}";
+        call(post(contacts), learner, "LEARNER", call1).andExpect(status().isForbidden());
+        call(post(contacts), support, "SUPPORT", call1).andExpect(status().isOk());
+        call(post(contacts), support, "SUPPORT", "{\"party\":\"TUTOR\",\"channel\":\"MESSAGE\",\"reached\":true,\"note\":\"Gia sư báo ốm\"}")
+                .andExpect(jsonPath("$.contacts", hasSize(2))).andExpect(jsonPath("$.contacts[1].reached").value(true));
+
+        when(identity.phone(tutor)).thenReturn("0901000002");
+        call(get("/api/v1/bookings/support/cases/" + c + "/phone?party=TUTOR"), support, "SUPPORT", null).andExpect(jsonPath("$.phone").value("0901000002"));
+        call(get("/api/v1/bookings/support/cases/" + c + "/phone?party=TUTOR"), learner, "LEARNER", null).andExpect(status().isForbidden());
+        assertEquals(1L, jdbc.sql("SELECT count(*) FROM contact_views WHERE case_id = ?").param(UUID.fromString(c)).query(Long.class).single());
+
+        String proposal = "{\"outcome\":\"TUTOR_FAULT\",\"reason\":\"Gia sư thừa nhận nghỉ không báo\"}";
+        call(post("/api/v1/bookings/support/cases/" + c + "/proposal"), support, "SUPPORT", proposal)
+                .andExpect(jsonPath("$.caseInfo.status").value("OPEN")).andExpect(jsonPath("$.caseInfo.proposedOutcome").value("TUTOR_FAULT"))
+                .andExpect(jsonPath("$.events[*].action", hasItem("PROPOSED")));
+        call(post("/api/v1/bookings/admin/cases/" + c + "/decide"), support, "SUPPORT", proposal).andExpect(status().isForbidden());
+        call(get("/api/v1/bookings/sessions/" + s.get(1)), learner, "LEARNER", null).andExpect(jsonPath("$.status").value("TUTOR_ABSENT_REPORTED"));
+        call(post("/api/v1/bookings/admin/cases/" + c + "/decide"), admin, "ADMIN", proposal).andExpect(jsonPath("$.session.status").value("FAILED_TUTOR"));
+        call(get("/api/v1/bookings/support/cases/" + c + "/phone?party=TUTOR"), support, "SUPPORT", null).andExpect(status().isConflict());
+        call(post("/api/v1/bookings/support/cases/" + c + "/proposal"), support, "SUPPORT", proposal).andExpect(status().isConflict());
+    }
+
+    @Test
+    void supportProposesStrikesThatCountOnlyAfterAdminApproval() throws Exception {
+        UUID learner = UUID.randomUUID();
+        UUID support = UUID.randomUUID();
+        UUID admin = UUID.randomUUID();
+        String body = "{\"learnerId\":\"" + learner + "\",\"kind\":\"NO_SHOW\",\"reason\":\"Vắng không báo, đã gọi 2 lần không nghe\"}";
+        call(post("/api/v1/bookings/support/strike-proposals"), admin, "ADMIN", body).andExpect(status().isForbidden());
+        long id = ((Number) JsonPath.read(call(post("/api/v1/bookings/support/strike-proposals"), support, "SUPPORT", body)
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING"))
+                .andReturn().getResponse().getContentAsString(), "$.id")).longValue();
+        String strikes = "/api/v1/bookings/admin/learners/" + learner + "/strikes";
+        call(get(strikes), admin, "ADMIN", null).andExpect(jsonPath("$.activeStrikes").value(0));
+        call(get("/api/v1/bookings/admin/strike-proposals"), support, "SUPPORT", null).andExpect(jsonPath("$[*].id", hasItem((int) id)));
+        call(post("/api/v1/bookings/admin/strike-proposals/" + id + "/approve"), support, "SUPPORT", null).andExpect(status().isForbidden());
+        call(post("/api/v1/bookings/admin/strike-proposals/" + id + "/approve"), admin, "ADMIN", null).andExpect(jsonPath("$.status").value("APPROVED"));
+        call(get(strikes), admin, "ADMIN", null).andExpect(jsonPath("$.activeStrikes").value(1));
+        call(post("/api/v1/bookings/admin/strike-proposals/" + id + "/approve"), admin, "ADMIN", null).andExpect(status().isConflict());
+
+        long second = ((Number) JsonPath.read(call(post("/api/v1/bookings/support/strike-proposals"), support, "SUPPORT", body)
+                .andReturn().getResponse().getContentAsString(), "$.id")).longValue();
+        call(post("/api/v1/bookings/admin/strike-proposals/" + second + "/reject"), admin, "ADMIN", "{\"note\":\"\"}").andExpect(status().isBadRequest());
+        call(post("/api/v1/bookings/admin/strike-proposals/" + second + "/reject"), admin, "ADMIN", "{\"note\":\"Người thuê đã báo trước qua điện thoại\"}")
+                .andExpect(jsonPath("$.status").value("REJECTED"));
+        call(get(strikes), admin, "ADMIN", null).andExpect(jsonPath("$.activeStrikes").value(1));
+    }
+
+    @Test
+    void internalFactsForAssessmentAndCare() throws Exception {
+        UUID tutor = UUID.randomUUID();
+        UUID learner = UUID.randomUUID();
+        UUID service = UUID.randomUUID();
+        List<UUID> s = confirmedSessions(learner, tutor);
+        UUID plan = planOf(s.get(0));
+        call(get("/api/v1/bookings/internal/plans/" + plan + "/summary"), learner, "LEARNER", null).andExpect(status().isForbidden());
+        call(get("/api/v1/bookings/internal/plans/" + plan + "/summary"), service, "SERVICE", null)
+                .andExpect(jsonPath("$.learnerId").value(learner.toString())).andExpect(jsonPath("$.tutorId").value(tutor.toString()))
+                .andExpect(jsonPath("$.subjectCode").value("TOAN")).andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+        call(post("/api/v1/bookings/sessions/" + s.get(3) + "/cancel"), learner, "LEARNER", "{\"reason\":\"Bận thi\"}").andExpect(status().isOk());
+        String signals = call(get("/api/v1/bookings/internal/care/signals"), service, "SERVICE", null).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Integer> cancels = JsonPath.read(signals, "$[?(@.learnerId == '" + learner + "')].cancels30d");
+        assertEquals(List.of(1), cancels);
+
+        String ticket = "{\"sessionId\":\"" + s.get(2) + "\",\"reason\":\"Phiếu hỗ trợ: gia sư dạy thiếu giờ\"}";
+        String caseId = JsonPath.read(call(post("/api/v1/bookings/internal/cases/from-ticket"), service, "SERVICE", ticket)
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.caseId");
+        call(post("/api/v1/bookings/internal/cases/from-ticket"), service, "SERVICE", ticket).andExpect(jsonPath("$.caseId").value(caseId));
+        assertEquals(caseId, caseIdOf(s.get(2)));
+    }
 }
