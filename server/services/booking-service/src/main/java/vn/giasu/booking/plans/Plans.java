@@ -95,7 +95,7 @@ public class Plans {
     }
 
     /** Sessions that are settled for closing the period: taught and accepted, learner absent, cancelled, or never booked. */
-    static final Set<String> DONE = Set.of("CONFIRMED", "LEARNER_ABSENT", "CANCELLED", "RELEASED");
+    static final Set<String> DONE = Set.of("CONFIRMED", "LEARNER_ABSENT", "FAILED_TUTOR", "CANCELLED", "RELEASED");
     /** Open obligations: wait for the case module (P07); the period cannot close normally while one is open. */
     static final Set<String> OPEN = Set.of("DISPUTED", "TUTOR_ABSENT_REPORTED");
 
@@ -112,7 +112,8 @@ public class Plans {
         String next;
         if (sessions.stream().anyMatch(s -> OPEN.contains(s.status()))) {
             next = "HET_KY_CON_NGHIA_VU";
-        } else if (sessions.stream().anyMatch(s -> "CANCELLED".equals(s.status()) && plan.tutorId().equals(s.cancelledBy()))) {
+        } else if (sessions.stream().anyMatch(s -> "FAILED_TUTOR".equals(s.status())
+                || "CANCELLED".equals(s.status()) && plan.tutorId().equals(s.cancelledBy()))) {
             next = "KET_THUC_CO_HOAN_MOT_PHAN";
         } else {
             next = "HOAN_TAT_NGHIA_VU";

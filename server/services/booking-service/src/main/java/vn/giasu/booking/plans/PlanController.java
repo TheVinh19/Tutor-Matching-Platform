@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 import vn.giasu.booking.Notifier;
 import vn.giasu.booking.Schedule;
 import vn.giasu.booking.TutorClient;
+import vn.giasu.booking.cases.Cases;
 import vn.giasu.booking.holds.HoldJobs;
 import vn.giasu.booking.plans.Plans.Plan;
 import vn.giasu.booking.plans.Plans.Session;
@@ -73,13 +74,15 @@ class PlanController {
     private final TutorClient tutors;
     private final Notifier notifier;
     private final HoldJobs holds;
+    private final Cases cases;
 
-    PlanController(JdbcClient jdbc, Plans plans, TutorClient tutors, Notifier notifier, HoldJobs holds) {
+    PlanController(JdbcClient jdbc, Plans plans, TutorClient tutors, Notifier notifier, HoldJobs holds, Cases cases) {
         this.jdbc = jdbc;
         this.plans = plans;
         this.tutors = tutors;
         this.notifier = notifier;
         this.holds = holds;
+        this.cases = cases;
     }
 
     @PostMapping("/api/v1/bookings/plans")
@@ -120,7 +123,12 @@ class PlanController {
     }
 
     private PlanDetail create(UUID learnerId, CreateRequest r, UUID renewedFrom) {
-        TutorClient.TutorProfile tutor = tutors.requireApproved(r.tutorId());
+        OffsetDateTime blocked = cases.restrictedUntil(learnerId);
+        if (blocked != null) {
+            throw new ApiException(HttpStatus.CONFLICT, "LEARNER_RESTRICTED", "Tài khoản bị tạm khóa đặt đơn mới đến "
+                    + blocked.atZoneSameInstant(Schedule.ZONE).toLocalDate() + " (3 vi phạm trong 90 ngày)");
+        }
+        TutorClient.TutorProfile tutor = requireCanTakeNew(r.tutorId());
         if (!tutor.subjects().contains(new TutorClient.SubjectLevel(r.subjectCode(), r.levelCode()))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "SUBJECT_NOT_OFFERED", "Gia sư chưa được duyệt dạy môn/cấp học này");
         }
@@ -186,6 +194,7 @@ class PlanController {
         Plan plan = plans.getForUpdate(id);
         Plans.require(plan.tutorId().equals(Plans.caller(jwt)), "NOT_PLAN_TUTOR", "Không phải gia sư của kế hoạch này");
         Plans.requireStatus("REQUESTED".equals(plan.status()), "Chỉ lập kế hoạch cho yêu cầu đang chờ");
+        requireCanTakeNew(plan.tutorId());
 
         boolean grid = plan.sessionsPerWeek() != null;
         if (grid) {
@@ -304,6 +313,15 @@ class PlanController {
     Eligibility eligibility(@PathVariable UUID id) {
         Plan plan = plans.get(id);
         return new Eligibility(plan.id(), plan.learnerId(), plan.tutorId(), plan.status(), plan.closedAt());
+    }
+
+    /** P09: a tutor who lost a rank condition sends no new plans until the admin decides; confirmed periods go on. */
+    private TutorClient.TutorProfile requireCanTakeNew(UUID tutorId) {
+        TutorClient.TutorProfile tutor = tutors.requireApproved(tutorId);
+        if (tutor.rankUnderReview()) {
+            throw new ApiException(HttpStatus.CONFLICT, "RANK_UNDER_REVIEW", "Gia sư đang chờ admin xét lại Hạng, tạm dừng nhận kế hoạch mới");
+        }
+        return tutor;
     }
 
     private PlanDetail detailOf(UUID id) {

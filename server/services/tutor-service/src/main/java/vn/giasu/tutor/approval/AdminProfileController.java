@@ -59,6 +59,13 @@ class AdminProfileController {
     @PostMapping("/{accountId}/approve")
     @Transactional
     ProfileDetail approve(@PathVariable UUID accountId, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody(required = false) ApproveRequest request) {
+        if (request != null && Boolean.TRUE.equals(request.entryRank2())) {
+            // Rank 2 entry needs both evidence groups: degree/certificate and at least one year of teaching experience.
+            long groups = jdbc.sql("SELECT count(DISTINCT kind) FROM tutor_evidence WHERE account_id = ?").param(accountId).query(Long.class).single();
+            if (groups < 2) {
+                throw new ApiException(HttpStatus.CONFLICT, "EVIDENCE_REQUIRED", "Hạng 2 đầu vào cần đủ minh chứng bằng cấp và kinh nghiệm ≥ 1 năm");
+            }
+        }
         ProfileDetail approved = decide(accountId, Status.APPROVED, jwt, request == null ? null : request.note());
         if (request != null && Boolean.TRUE.equals(request.entryRank2()) && approved.profile().rank() == 1) {
             UUID admin = UUID.fromString(jwt.getSubject());

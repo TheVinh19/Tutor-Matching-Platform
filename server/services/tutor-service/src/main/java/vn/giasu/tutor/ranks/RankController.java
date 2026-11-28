@@ -6,8 +6,6 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import java.time.Duration;
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
@@ -53,11 +51,13 @@ class RankController {
     private final JdbcClient jdbc;
     private final ExpLedger ledger;
     private final ExpSyncJob syncJob;
+    private final RankFlags flags;
 
-    RankController(JdbcClient jdbc, ExpLedger ledger, ExpSyncJob syncJob) {
+    RankController(JdbcClient jdbc, ExpLedger ledger, ExpSyncJob syncJob, RankFlags flags) {
         this.jdbc = jdbc;
         this.ledger = ledger;
         this.syncJob = syncJob;
+        this.flags = flags;
     }
 
     @GetMapping("/api/v1/tutors/me/exp")
@@ -136,10 +136,7 @@ class RankController {
         UUID id = row.accountId();
         ExpLedger.Stats stats = ledger.stats(id);
         int exp = ledger.total(id);
-        long days = row.rankSince() == null ? 0 : Duration.between(row.rankSince().toInstant(), Instant.now()).toDays();
-        Flag flag = "APPROVED".equals(row.status()) ? RankRules.flag(new RankRules.Input(row.rank(), exp, stats.distinctLearners(), stats.renewals(),
-                stats.taughtSessions(), stats.tutorFaultFailed(), stats.openIssues(), row.entryRank2(), days,
-                ledger.penalizedSince(id, Instant.now().minus(Duration.ofDays(90))))) : Flag.OK;
+        Flag flag = "APPROVED".equals(row.status()) ? flags.flag(id, row.rank(), row.entryRank2(), row.rankSince()) : Flag.OK;
         return new RankView(id, row.fullName(), row.rank(), row.entryRank2(), row.rankSince(), exp, stats,
                 RankRules.completionRate(stats.taughtSessions(), stats.tutorFaultFailed()), flag);
     }

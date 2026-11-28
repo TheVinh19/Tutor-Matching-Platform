@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 class ExpSourcesController {
     record Event(String key, String type, int points, String refType, UUID refId, OffsetDateTime occurredAt) {}
-    /** tutorFaultFailed stays 0 until the case module concludes tutor-fault failures. */
+    /** tutorFaultFailed: sessions a case concluded as the tutor's fault (FAILED_TUTOR). */
     record Stats(long taughtSessions, long tutorFaultFailed, long distinctLearners, long renewals, long openIssues) {}
     record Sources(List<Event> events, Stats stats) {}
 
@@ -45,7 +45,7 @@ class ExpSourcesController {
                 .param(tutorId).query(Event.class).list());
         Stats stats = jdbc.sql("""
                 SELECT (SELECT count(*) FROM sessions WHERE tutor_id = :t AND status = 'CONFIRMED') AS taught_sessions,
-                       0 AS tutor_fault_failed,
+                       (SELECT count(*) FROM sessions WHERE tutor_id = :t AND status = 'FAILED_TUTOR') AS tutor_fault_failed,
                        (SELECT count(DISTINCT learner_id) FROM plans WHERE tutor_id = :t AND status = 'HOAN_TAT_NGHIA_VU') AS distinct_learners,
                        (SELECT count(*) FROM plans WHERE tutor_id = :t AND renewal_qualified_at IS NOT NULL) AS renewals,
                        (SELECT count(*) FROM sessions WHERE tutor_id = :t AND status IN ('DISPUTED', 'TUTOR_ABSENT_REPORTED')) AS open_issues""")

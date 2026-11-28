@@ -74,7 +74,7 @@ class BookingApiPostgresTest {
         mvc = MockMvcBuilders.webAppContextSetup(context)
                 .addFilters(context.getBean("springSecurityFilterChain", jakarta.servlet.Filter.class)).build();
         when(tutors.requireApproved(any())).thenAnswer(inv -> new TutorClient.TutorProfile(inv.getArgument(0), "GS", "APPROVED", "FLEX", 1,
-                List.of(new TutorClient.SubjectLevel("TOAN", "THPT"))));
+                List.of(new TutorClient.SubjectLevel("TOAN", "THPT")), false));
     }
 
     String token(UUID id, String role) { return "Bearer " + issuer.issue(id, role, "x@t.vn", Duration.ofHours(1)).getTokenValue(); }
@@ -715,5 +715,105 @@ class BookingApiPostgresTest {
         jobs.remindRenewals();
         jobs.remindRenewals();
         verify(notifier, org.mockito.Mockito.times(1)).send(eq(learner), eq("PLAN_RENEWAL_REMINDER"), anyString(), anyString(), eq("PLAN"), eq(plan));
+    }
+
+    // ---- cases, learner strikes, rank review block ----
+
+    String caseIdOf(UUID session) {
+        return jdbc.sql("SELECT id FROM cases WHERE session_id = ?").param(session).query(UUID.class).single().toString();
+    }
+
+    @Test
+    void casesDecideAppealAndClosePeriod() throws Exception {
+        UUID tutor = UUID.randomUUID();
+        UUID learner = UUID.randomUUID();
+        UUID admin = UUID.randomUUID();
+        List<UUID> s = confirmedSessions(learner, tutor);
+        UUID plan = planOf(s.get(0));
+
+        // Dispute a taught session: a case opens, the tutor is told and has 72h.
+        jdbc.sql("""
+                UPDATE sessions SET status = 'COMPLETED_PENDING_CONFIRM', start_at = now() - interval '2 days 3 hours',
+                    started_at = now() - interval '2 days 3 hours', end_at = now() - interval '2 days 1 hour', block_until = now() - interval '2 days',
+                    completed_at = now() - interval '2 days', confirm_deadline = now() + interval '1 hour' WHERE id = ?""").param(s.get(0)).update();
+        call(post("/api/v1/bookings/sessions/" + s.get(0) + "/dispute"), learner, "LEARNER", "{\"reason\":\"Gia sư dạy 30 phút\"}").andExpect(status().isOk());
+        String c1 = caseIdOf(s.get(0));
+        verify(notifier).send(eq(tutor), eq("CASE_OPENED"), anyString(), anyString(), eq("CASE"), eq(UUID.fromString(c1)));
+        call(get("/api/v1/bookings/sessions/" + s.get(0) + "/case"), learner, "LEARNER", null)
+                .andExpect(jsonPath("$.caseInfo.status").value("OPEN")).andExpect(jsonPath("$.caseInfo.kind").value("DISPUTE"));
+        call(get("/api/v1/bookings/cases/" + c1), UUID.randomUUID(), "LEARNER", null).andExpect(status().isForbidden());
+
+        String evidence = "/api/v1/bookings/cases/" + c1 + "/evidence";
+        call(post(evidence), tutor, "TUTOR", "{\"urls\":[\"http://x\"]}").andExpect(status().isBadRequest());
+        call(post(evidence), UUID.randomUUID(), "TUTOR", "{\"urls\":[\"https://drive.google.com/a\"]}").andExpect(status().isForbidden());
+        call(post(evidence), tutor, "TUTOR", "{\"urls\":[\"https://drive.google.com/a\",\"https://drive.google.com/b\"],\"note\":\"Log Meet\"}")
+                .andExpect(jsonPath("$.evidence", hasSize(2))).andExpect(jsonPath("$.evidence[0].party").value("TUTOR"));
+
+        String decide = "/api/v1/bookings/admin/cases/" + c1 + "/decide";
+        call(post(decide), tutor, "TUTOR", "{\"outcome\":\"TUTOR_FAULT\",\"reason\":\"x\"}").andExpect(status().isForbidden());
+        call(post(decide), admin, "ADMIN", "{\"outcome\":\"TUTOR_FAULT\",\"reason\":\"Log Meet chỉ 30 phút\"}")
+                .andExpect(jsonPath("$.caseInfo.status").value("DECIDED")).andExpect(jsonPath("$.session.status").value("FAILED_TUTOR"));
+        call(post(decide), admin, "ADMIN", "{\"outcome\":\"NO_FAULT\",\"reason\":\"x\"}").andExpect(status().isConflict());
+        call(post(evidence), tutor, "TUTOR", "{\"urls\":[\"https://drive.google.com/c\"]}").andExpect(status().isConflict());
+
+        // Tutor appeals with new evidence (no 72h limit on appeal); the admin reverses: learner was wrong, a strike is recorded.
+        call(post("/api/v1/bookings/cases/" + c1 + "/appeal"), tutor, "TUTOR", "{\"reason\":\"Có bản ghi đủ 2 giờ\"}")
+                .andExpect(jsonPath("$.caseInfo.status").value("APPEALED"));
+        jdbc.sql("UPDATE cases SET evidence_deadline = now() - interval '1 hour' WHERE id = ?").param(UUID.fromString(c1)).update();
+        call(post(evidence), tutor, "TUTOR", "{\"urls\":[\"https://drive.google.com/record\"]}").andExpect(status().isOk());
+        call(post(decide), admin, "ADMIN", "{\"outcome\":\"LEARNER_WRONG\",\"reason\":\"Bản ghi đủ 2 giờ\"}")
+                .andExpect(jsonPath("$.session.status").value("CONFIRMED")).andExpect(jsonPath("$.events", hasSize(4)));
+        call(get("/api/v1/bookings/admin/learners/" + learner + "/strikes"), admin, "ADMIN", null)
+                .andExpect(jsonPath("$.activeStrikes").value(1)).andExpect(jsonPath("$.strikes[0].kind").value("FALSE_COMPLAINT"));
+
+        // Tutor absent with no evidence after 72h: the suggested outcome follows the learner; the admin decides.
+        startsIn(s.get(1), "-1 day -20 minutes");
+        call(post("/api/v1/bookings/sessions/" + s.get(1) + "/tutor-absent"), learner, "LEARNER", "{\"reason\":\"Không vào lớp\"}").andExpect(status().isOk());
+        String c2 = caseIdOf(s.get(1));
+        jdbc.sql("UPDATE cases SET evidence_deadline = now() - interval '1 minute' WHERE id = ?").param(UUID.fromString(c2)).update();
+        call(post("/api/v1/bookings/cases/" + c2 + "/evidence"), tutor, "TUTOR", "{\"urls\":[\"https://drive.google.com/late\"]}")
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EVIDENCE_WINDOW_CLOSED"));
+        call(get("/api/v1/bookings/admin/cases?status=OPEN"), admin, "ADMIN", null).andExpect(jsonPath("$[*].id", hasItem(c2)));
+        call(get("/api/v1/bookings/cases/" + c2), admin, "ADMIN", null).andExpect(jsonPath("$.suggestedOutcome").value("TUTOR_FAULT"));
+        call(post("/api/v1/bookings/admin/cases/" + c2 + "/decide"), admin, "ADMIN", "{\"outcome\":\"TUTOR_FAULT\",\"reason\":\"Không có giải trình\"}")
+                .andExpect(jsonPath("$.session.status").value("FAILED_TUTOR"));
+
+        teachAndConfirm(s.get(2), 4, tutor, learner);
+        teachAndConfirm(s.get(3), 3, tutor, learner);
+        assertEquals("KET_THUC_CO_HOAN_MOT_PHAN", planStatus(plan));
+        call(get("/api/v1/bookings/internal/tutors/" + tutor + "/exp-sources"), UUID.randomUUID(), "SERVICE", null)
+                .andExpect(jsonPath("$.stats.tutorFaultFailed").value(1)).andExpect(jsonPath("$.stats.openIssues").value(0));
+    }
+
+    @Test
+    void thirdStrikeIn90DaysBlocksNewPlans() throws Exception {
+        UUID tutor = UUID.randomUUID();
+        UUID learner = UUID.randomUUID();
+        UUID admin = UUID.randomUUID();
+        openMondayMorning(tutor);
+        String strikes = "/api/v1/bookings/admin/learners/" + learner + "/strikes";
+        call(post(strikes), admin, "ADMIN", "{\"kind\":\"SELF_CANCEL\",\"reason\":\"Tự hủy\"}").andExpect(jsonPath("$.restrictedUntil").value(org.hamcrest.Matchers.nullValue()));
+        call(post(strikes), admin, "ADMIN", "{\"kind\":\"NO_SHOW\",\"reason\":\"Vắng không báo\"}").andExpect(jsonPath("$.activeStrikes").value(2));
+        requestPlan(learner, tutor); // two warnings do not block
+        call(post(strikes), learner, "LEARNER", "{\"kind\":\"NO_SHOW\",\"reason\":\"x\"}").andExpect(status().isForbidden());
+        call(post(strikes), admin, "ADMIN", "{\"kind\":\"NO_SHOW\",\"reason\":\"Vắng lần 2\"}").andExpect(jsonPath("$.restrictedUntil").isNotEmpty());
+        call(post("/api/v1/bookings/plans"), learner, "LEARNER", """
+                {"tutorId":"%s","subjectCode":"TOAN","levelCode":"THPT","mode":"ONLINE"}""".formatted(tutor))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("LEARNER_RESTRICTED"));
+        call(get("/api/v1/bookings/me/restriction"), learner, "LEARNER", null).andExpect(jsonPath("$.activeStrikes").value(3));
+    }
+
+    @Test
+    void tutorUnderRankReviewTakesNoNewPlans() throws Exception {
+        UUID tutor = UUID.randomUUID();
+        UUID learner = UUID.randomUUID();
+        openMondayMorning(tutor);
+        UUID pending = requestPlan(learner, tutor);
+        when(tutors.requireApproved(eq(tutor))).thenReturn(new TutorClient.TutorProfile(tutor, "GS", "APPROVED", "FLEX", 2,
+                List.of(new TutorClient.SubjectLevel("TOAN", "THPT")), true));
+        call(post("/api/v1/bookings/plans"), learner, "LEARNER", """
+                {"tutorId":"%s","subjectCode":"TOAN","levelCode":"THPT","mode":"ONLINE"}""".formatted(tutor))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("RANK_UNDER_REVIEW"));
+        propose(tutor, pending, "08:00").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("RANK_UNDER_REVIEW"));
     }
 }

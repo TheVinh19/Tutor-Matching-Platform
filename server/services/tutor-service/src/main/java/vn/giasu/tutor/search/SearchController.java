@@ -52,15 +52,17 @@ class SearchController {
                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                 @RequestParam(defaultValue = "0") @Min(0) int page,
                 @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
-        StringBuilder where = new StringBuilder(" WHERE p.status = 'APPROVED'");
+        // P12: public only with at least one approved teaching video.
+        StringBuilder where = new StringBuilder(" WHERE p.status = 'APPROVED'"
+                + " AND EXISTS (SELECT 1 FROM tutor_videos v WHERE v.account_id = p.account_id AND v.status = 'APPROVED')");
         List<Object[]> params = new ArrayList<>();
 
         if (subjects != null && !subjects.isEmpty()) {
-            where.append(" AND EXISTS (SELECT 1 FROM tutor_subjects s WHERE s.account_id = p.account_id AND s.subject_code IN (:subjects)")
+            where.append(" AND EXISTS (SELECT 1 FROM tutor_subjects s WHERE s.account_id = p.account_id AND s.status = 'APPROVED' AND s.subject_code IN (:subjects)")
                     .append(level != null ? " AND s.level_code = :level)" : ")");
             params.add(new Object[] {"subjects", subjects});
         } else if (level != null) {
-            where.append(" AND EXISTS (SELECT 1 FROM tutor_subjects s WHERE s.account_id = p.account_id AND s.level_code = :level)");
+            where.append(" AND EXISTS (SELECT 1 FROM tutor_subjects s WHERE s.account_id = p.account_id AND s.status = 'APPROVED' AND s.level_code = :level)");
         }
         if (level != null) params.add(new Object[] {"level", level});
         if (ranks != null && !ranks.isEmpty()) {

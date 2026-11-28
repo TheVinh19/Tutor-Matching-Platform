@@ -58,7 +58,7 @@ public class ProfileStore {
 
     Map<UUID, List<SubjectLevel>> subjects(Collection<UUID> ids) {
         if (ids.isEmpty()) return Map.of();
-        return jdbc.sql("SELECT account_id, subject_code, level_code FROM tutor_subjects WHERE account_id IN (:ids) ORDER BY subject_code, level_code")
+        return jdbc.sql("SELECT account_id, subject_code, level_code FROM tutor_subjects WHERE account_id IN (:ids) AND status = 'APPROVED' ORDER BY subject_code, level_code")
                 .param("ids", ids)
                 .query((rs, n) -> Map.entry(rs.getObject(1, UUID.class), new SubjectLevel(rs.getString(2), rs.getString(3))))
                 .list().stream()

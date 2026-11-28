@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import vn.giasu.booking.Notifier;
 import vn.giasu.booking.Schedule;
+import vn.giasu.booking.cases.Cases;
 import vn.giasu.booking.plans.Plans;
 import vn.giasu.booking.plans.Plans.Session;
 import vn.giasu.common.web.ApiException;
@@ -46,11 +47,13 @@ class SessionController {
     private final JdbcClient jdbc;
     private final Plans plans;
     private final Notifier notifier;
+    private final Cases cases;
 
-    SessionController(JdbcClient jdbc, Plans plans, Notifier notifier) {
+    SessionController(JdbcClient jdbc, Plans plans, Notifier notifier, Cases cases) {
         this.jdbc = jdbc;
         this.plans = plans;
         this.notifier = notifier;
+        this.cases = cases;
     }
 
     @GetMapping("/api/v1/bookings/sessions/me")
@@ -178,6 +181,7 @@ class SessionController {
                 .params(r.reason().strip(), id).update();
         notifier.send(s.tutorId(), "SESSION_TUTOR_ABSENT", "Học sinh báo bạn không dạy buổi học",
                 "Buổi " + local(s.startAt()) + ": " + r.reason().strip(), "SESSION", id);
+        cases.open(s, "TUTOR_ABSENT", r.reason().strip());
         plans.closeIfDone(s.planId());
         return plans.session(id, false);
     }
@@ -208,6 +212,7 @@ class SessionController {
         }
         jdbc.sql("UPDATE sessions SET status = 'DISPUTED', dispute_reason = ?, updated_at = now() WHERE id = ?").params(r.reason().strip(), id).update();
         notifier.send(s.tutorId(), "SESSION_DISPUTED", "Học sinh phản đối buổi học", r.reason().strip(), "SESSION", id);
+        cases.open(s, "DISPUTE", r.reason().strip());
         plans.closeIfDone(s.planId());
         return plans.session(id, false);
     }
