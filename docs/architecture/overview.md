@@ -14,7 +14,7 @@
 | notification-service | 8085 | notification_db / notification_app |
 | assessment-service | 8086 | assessment_db / assessment_app |
 | care-service | 8087 | care_db / care_app |
-| ai-service | 8089 | ai_db / ai_app (chế độ truy xuất, chưa gọi mô hình ngoài) |
+| ai-service | 8089 | ai_db / ai_app (chế độ truy xuất, chưa gọi Gemini) |
 | web | 3000 | Không sở hữu dữ liệu nghiệp vụ |
 
 Cổng 8081–8089 là cổng mặc định của ứng dụng khi chạy local. Trong Compose, các service này chỉ được truy cập qua mạng nội bộ và gateway. Nginx local dùng cổng 8088.
@@ -54,7 +54,7 @@ Lệnh chạy và kiểm tra nằm trong [README dự án](../../README.md). Có
 
 ## Tích hợp và vận hành dự kiến
 
-Mailpit nhận email local. Meet là liên kết do gia sư nhập/cập nhật; Leaflet bổ sung khi triển khai giao diện địa bàn. API mô hình ngôn ngữ (nhà cung cấp chờ chốt, Gemini đang cân nhắc) chỉ gọi từ ai-service ở backend, không gửi dữ liệu liên hệ, thanh toán hay bằng chứng. Bằng chứng riêng và video chưa duyệt đi qua API có kiểm tra quyền; không đặt vào `web/public`.
+Mailpit nhận email local. Meet là liên kết do gia sư nhập/cập nhật; Leaflet bổ sung khi triển khai giao diện địa bàn. API Google Gemini (chốt 29/11/2026) chỉ gọi từ ai-service ở backend, API key chỉ ở biến môi trường của ai-service, không gửi dữ liệu liên hệ, thanh toán hay bằng chứng. Bằng chứng riêng và video chưa duyệt đi qua API có kiểm tra quyền; không đặt vào `web/public`.
 
 Prometheus/Grafana, HTTPS/Certbot, backup/restore, GHCR và deploy VPS mới có vị trí dành sẵn trong infra/docs. CI hiện cấu hình Maven verify và web build/typecheck; chưa publish hoặc deploy.
 

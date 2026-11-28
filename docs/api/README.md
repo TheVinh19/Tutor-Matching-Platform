@@ -183,7 +183,7 @@ Xếp tầng (job 06:00 giờ Việt Nam): T4 có vụ việc mở, đang bị k
 
 ## AI
 
-Trợ lý mức 2 (P17), chế độ truy xuất tới khi chốt nhà cung cấp mô hình: trả lời từ bộ quy định có sẵn và FAQ của care, kèm nguồn; không tra dữ liệu riêng, không thao tác thay người dùng.
+Trợ lý mức 2 (P17), mô hình Google Gemini; hiện chạy chế độ truy xuất, chưa gọi Gemini: trả lời từ bộ quy định có sẵn và FAQ của care, kèm nguồn; không tra dữ liệu riêng, không thao tác thay người dùng.
 
 | Method | Path | Quyền | Ghi chú |
 |---|---|---|---|

@@ -10,7 +10,7 @@ Tài liệu này mô tả toàn bộ phạm vi dự án ở mức thiết kế c
 | `Vai_tro_va_quyen_nen_tang_gia_su.docx` | Các bảng “Hồ sơ và kế hoạch học”, “Buổi học và quản trị”, “Khảo thí, trợ lý AI và chăm sóc khách hàng”, “Các quyền cần đối chiếu”: phạm vi Người thuê, Gia sư, Nhân viên CSKH, Admin và quyền theo chủ đơn/vụ việc. |
 | `Luong_nghiep_vu_va_trang_thai_du_an_gia_su.docx` | Các mục kế hoạch và thu tiền, gia hạn, đổi lịch, buổi học, đóng/hủy kỳ, thu chi, Hạng/EXP/nhận xét, khiếu nại và bằng chứng, hỗ trợ và phản hồi, chăm sóc 4 tầng, khảo thí, trợ lý AI. |
 | `Bang_chung_va_chi_so_van_hanh.docx` | Dữ liệu cần lưu để kiểm chứng, cách phân biệt các chỉ số vận hành, khoản tiền, EXP, nhận xét, tranh chấp, khảo thí, hỗ trợ/chăm sóc và trợ lý AI. |
-| `Kien_truc_va_tich_hop_nen_tang_gia_su.docx` | Stack và các tích hợp của dự án, gồm service khảo thí, chăm sóc khách hàng và trợ lý AI (nhà cung cấp mô hình chờ chốt). |
+| `Kien_truc_va_tich_hop_nen_tang_gia_su.docx` | Stack và các tích hợp của dự án, gồm service khảo thí, chăm sóc khách hàng và trợ lý AI (mô hình Google Gemini). |
 
 Các quy tắc đã thống nhất trong tài liệu nghiệp vụ. Cách chia service, tên module và route dưới đây là quyết định tổ chức khung repo; chúng không thay đổi chính sách P01–P18. Câu ghi Đề xuất hoặc Chờ chốt trong P16–P18 chưa áp dụng. Nếu cách chia phát hiện mâu thuẫn với chính sách, đối chiếu nguồn chính trước khi thêm nghiệp vụ.
 
@@ -111,9 +111,9 @@ Chăm sóc khách hàng theo P18, dùng vai trò `SUPPORT`.
 Trợ lý AI mức 2 theo P17; mô tả trong `server/services/ai-service/README.md`.
 
 - Hỏi đáp dựa trên FAQ (từ care) và quy định đã duyệt, có dẫn nguồn; không chắc thì tạo phiếu ở care.
-- Trợ lý học tập: giải thích câu sai, gợi ý ôn tập, tóm tắt trình độ cho gia sư. Sinh nháp câu hỏi cho assessment (bắt buộc duyệt) làm khi chốt nhà cung cấp.
-- Hiện chạy chế độ truy xuất: so khớp câu hỏi với bộ quy định có sẵn và FAQ, dưới ngưỡng thì không đoán; giới hạn 30 câu/người/ngày; che số điện thoại/email trước khi lưu.
-- Không tra dữ liệu riêng, không thao tác thay người dùng, không gửi liên hệ/thanh toán/bằng chứng sang nhà cung cấp mô hình. Nhà cung cấp chờ chốt.
+- Trợ lý học tập: giải thích câu sai, gợi ý ôn tập, tóm tắt trình độ cho gia sư. Sinh nháp câu hỏi cho assessment (bắt buộc duyệt) làm khi tích hợp Gemini.
+- Hiện chạy chế độ truy xuất, chưa gọi Gemini: so khớp câu hỏi với bộ quy định có sẵn và FAQ, dưới ngưỡng thì không đoán; giới hạn 30 câu/người/ngày; che số điện thoại/email trước khi lưu.
+- Không tra dữ liệu riêng, không thao tác thay người dùng, không gửi liên hệ/thanh toán/bằng chứng sang nhà cung cấp mô hình. Mô hình: Google Gemini (chốt 29/11/2026), chỉ gọi từ backend.
 - Không phải thuật toán gợi ý hay xếp hạng gia sư. LMS/đăng ký khóa học, SSO và cổng tuyển dụng vẫn ngoài phạm vi.
 
 ## Trao đổi xuyên service
@@ -211,4 +211,4 @@ Vụ đang mở phải giữ chứng cứ và lịch sử xử lý. Không xóa 
 
 ## Những phần chưa được khung repo quyết định
 
-ERD, ràng buộc khóa lịch cụ thể, API và event schema, lịch chạy timer, cơ chế retry/outbox, cách chứng minh thông báo bắt đầu timer, lưu trữ file triển khai thật và nhà cung cấp mô hình AI (P17, chờ chốt) cần được thiết kế ở bước nghiệp vụ tương ứng. Bản đồ này xác định nơi sở hữu trách nhiệm; không thay thế các quyết định kỹ thuật hoặc kiểm thử của từng luồng.
+ERD, ràng buộc khóa lịch cụ thể, API và event schema, lịch chạy timer, cơ chế retry/outbox, cách chứng minh thông báo bắt đầu timer, lưu trữ file triển khai thật và cách tích hợp Gemini cho trợ lý AI (P17) cần được thiết kế ở bước nghiệp vụ tương ứng. Bản đồ này xác định nơi sở hữu trách nhiệm; không thay thế các quyết định kỹ thuật hoặc kiểm thử của từng luồng.
