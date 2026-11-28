@@ -12,7 +12,9 @@ gia-su-platform/                              # Tên minh họa, không đổi w
 │   │   ├── booking-service/                 # :8083; learning_db
 │   │   ├── payment-service/                 # :8084; payment_db, tiền mô phỏng
 │   │   ├── notification-service/            # :8085; notification_db
-│   │   └── ai-service/                      # README, chờ đặc tả Gemini
+│   │   ├── assessment-service/              # README, khảo thí mức 2 (P16), chưa có ứng dụng
+│   │   ├── care-service/                    # README, chăm sóc khách hàng/CSKH (P18), chưa có ứng dụng
+│   │   └── ai-service/                      # README, trợ lý AI mức 2 (P17), chưa có ứng dụng
 │   ├── libs/
 │   │   ├── common-core/                     # README; contract/helper khi cần
 │   │   └── common-observability/            # README; metrics/request ID khi cần

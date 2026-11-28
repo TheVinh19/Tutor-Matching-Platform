@@ -103,7 +103,7 @@ Backend: test route Gateway, test JWT/phân quyền cho 5 service và test API i
 
 Module có README trong package/features/libs/mock/monitoring là vị trí thiết kế. Chưa có ERD chi tiết, OpenAPI/Swagger UI, thư viện form/UI, Postman/Playwright, outbox, giám sát hoặc triển khai VPS. Chỉ thêm khi triển khai chức năng tương ứng.
 
-Thanh toán/hoàn/chi của đồ án chỉ mô phỏng. Không giữ tiền thật; không có LMS SSO, tuyển dụng, khoảng thiếu hụt học tập, lọc giá hoặc thuật toán xếp hạng gia sư. Không commit .env, bí mật hoặc bằng chứng riêng. Chỉ public asset nằm ở web/public.
+Thanh toán/hoàn/chi của đồ án chỉ mô phỏng. Không giữ tiền thật; không có LMS/đăng ký khóa học, SSO, cổng tuyển dụng, lọc giá hoặc thuật toán xếp hạng gia sư. Khảo thí, trợ lý AI và chăm sóc khách hàng (vai trò CSKH) đã chốt phạm vi mức 2 theo P16–P18 nhưng chưa triển khai. Không commit .env, bí mật hoặc bằng chứng riêng. Chỉ public asset nằm ở web/public.
 
 Dừng mà giữ dữ liệu:
 

@@ -6,26 +6,28 @@ Tài liệu này mô tả toàn bộ phạm vi dự án ở mức thiết kế c
 
 | Nguồn trong `Tai lieu/` | Nội dung dùng để thiết kế |
 |---|---|
-| `Yeu_cau_du_an_gia_su_v1.2.docx` | Nguồn chính sách chính, mục 15 với P01–P15. Dùng để đối chiếu điều kiện và các mốc thời gian chi tiết. |
-| `Vai_tro_va_quyen_nen_tang_gia_su_v1.2.docx` | Các bảng “Hồ sơ và kế hoạch học”, “Buổi học và quản trị”, “Các quyền cần đối chiếu”: phạm vi Người thuê, Gia sư, Admin và quyền theo chủ đơn/vụ việc. |
-| `Luong_nghiep_vu_va_trang_thai_du_an_gia_su_v1.2.docx` | Các mục kế hoạch và thu tiền, gia hạn, đổi lịch, buổi học, đóng/hủy kỳ, thu chi, Hạng/EXP/nhận xét, khiếu nại và bằng chứng. |
-| `Bang_chung_va_chi_so_van_hanh_v1.2.docx` | Dữ liệu cần lưu để kiểm chứng, cách phân biệt các chỉ số vận hành, khoản tiền, EXP, nhận xét và tranh chấp. |
-| `Kien_truc_va_tich_hop_nen_tang_gia_su.docx` | Stack và các tích hợp của dự án; AI Career Assistant/Gemini có phạm vi cần đặc tả riêng. Chưa biến placeholder thành chức năng tư vấn hay gợi ý gia sư. |
+| `Yeu_cau_du_an_gia_su.docx` | Nguồn chính sách chính, mục 15 với P01–P18 (P16 khảo thí, P17 trợ lý AI, P18 chăm sóc khách hàng, bổ sung 28/11/2026). Dùng để đối chiếu điều kiện và các mốc thời gian chi tiết. |
+| `Vai_tro_va_quyen_nen_tang_gia_su.docx` | Các bảng “Hồ sơ và kế hoạch học”, “Buổi học và quản trị”, “Khảo thí, trợ lý AI và chăm sóc khách hàng”, “Các quyền cần đối chiếu”: phạm vi Người thuê, Gia sư, Nhân viên CSKH, Admin và quyền theo chủ đơn/vụ việc. |
+| `Luong_nghiep_vu_va_trang_thai_du_an_gia_su.docx` | Các mục kế hoạch và thu tiền, gia hạn, đổi lịch, buổi học, đóng/hủy kỳ, thu chi, Hạng/EXP/nhận xét, khiếu nại và bằng chứng, hỗ trợ và phản hồi, chăm sóc 4 tầng, khảo thí, trợ lý AI. |
+| `Bang_chung_va_chi_so_van_hanh.docx` | Dữ liệu cần lưu để kiểm chứng, cách phân biệt các chỉ số vận hành, khoản tiền, EXP, nhận xét, tranh chấp, khảo thí, hỗ trợ/chăm sóc và trợ lý AI. |
+| `Kien_truc_va_tich_hop_nen_tang_gia_su.docx` | Stack và các tích hợp của dự án, gồm service khảo thí, chăm sóc khách hàng và trợ lý AI (nhà cung cấp mô hình chờ chốt). |
 
-Các quy tắc v1.2 đã thống nhất trong tài liệu nghiệp vụ. Cách chia service, tên module và route dưới đây là quyết định tổ chức khung repo; chúng không thay đổi chính sách P01–P15. Nếu cách chia phát hiện mâu thuẫn với chính sách, đối chiếu nguồn chính trước khi thêm nghiệp vụ.
+Các quy tắc đã thống nhất trong tài liệu nghiệp vụ. Cách chia service, tên module và route dưới đây là quyết định tổ chức khung repo; chúng không thay đổi chính sách P01–P18. Câu ghi Đề xuất hoặc Chờ chốt trong P16–P18 chưa áp dụng. Nếu cách chia phát hiện mâu thuẫn với chính sách, đối chiếu nguồn chính trước khi thêm nghiệp vụ.
 
 ## Cấu trúc tổng thể
 
 | Đường dẫn | Vai trò |
 |---|---|
 | `server/api-gateway/` | Định tuyến API và chính sách truy cập đầu vào. Service vẫn kiểm tra quyền và quyền sở hữu dữ liệu. |
-| `server/services/identity-service/` | Tài khoản, xác minh email, đăng nhập, phiên, vai trò và hạn chế tài khoản. |
+| `server/services/identity-service/` | Tài khoản, xác minh email, đăng nhập, phiên, vai trò (gồm `SUPPORT` cho nhân viên CSKH) và hạn chế tài khoản. |
 | `server/services/tutor-service/` | Hồ sơ gia sư, danh mục, xét duyệt, tìm kiếm, nhận xét, EXP và Hạng. |
 | `server/services/booking-service/` | Kết nối/trao đổi, lịch trống, kế hoạch, giữ lịch, kỳ học, buổi học và vụ việc. |
 | `server/services/payment-service/` | Giá, QR mô phỏng, giao dịch, sổ tiền, hoàn/thu hồi/chi mô phỏng. |
 | `server/services/notification-service/` | Thông báo web, email và lịch sử gửi. |
-| `server/services/ai-service/` | Chỉ có README mô tả phần chờ đặc tả AI; chưa có ứng dụng chạy hoặc API nghiệp vụ. |
-| `web/src/app/` | Next.js App Router cho giao diện công khai và ba vai trò. |
+| `server/services/assessment-service/` | Chỉ có README: khảo thí mức 2 theo P16 — ngân hàng câu hỏi, bài đầu kỳ/định kỳ/cuối kỳ, chấm tự động, bảng điểm. |
+| `server/services/care-service/` | Chỉ có README: chăm sóc khách hàng theo P18 — phiếu hỗ trợ, FAQ, tầng chăm sóc, nhật ký liên hệ. |
+| `server/services/ai-service/` | Chỉ có README: trợ lý AI mức 2 theo P17; chưa có ứng dụng chạy hoặc API nghiệp vụ. |
+| `web/src/app/` | Next.js App Router cho giao diện công khai và các vai trò Người thuê, Gia sư, Nhân viên CSKH, Admin. |
 | `mock/` | Giả lập nhà cung cấp thanh toán và callback khi triển khai luồng tiền. |
 | `infra/` | Hạ tầng local, cấu hình chạy, database, Kafka, Redis, Mailpit và volume. |
 | `docs/` | Kiến trúc, phạm vi nghiệp vụ, hợp đồng tích hợp và hướng dẫn chạy/kiểm tra. |
@@ -39,7 +41,8 @@ Tên service mới không kéo theo đổi tên database, DB username hoặc bi�
 Module trong khung: `registration`, `verification`, `authentication`, `accounts`, `restrictions`. Phiên thuộc `authentication`; vai trò thuộc `accounts`.
 
 - Sở hữu danh tính, email, thông tin đăng nhập, vai trò, phiên và trạng thái truy cập tài khoản.
-- Một email chỉ một vai trò theo P01. Giao diện `/learner` đại diện tài khoản Người thuê; đây không phải vai trò thứ tư.
+- Một email chỉ một vai trò theo P01. Giao diện `/learner` đại diện tài khoản Người thuê; người học không phải vai trò riêng.
+- Vai trò `SUPPORT` (nhân viên CSKH) do admin cấp, không đăng ký công khai (P18).
 - Không trao quyền xác nhận/nghiệm thu cho người học khác tài khoản đứng tên đơn.
 - Nhận kết quả hạn chế tài khoản sau xử lý nghiệp vụ; bằng chứng và căn cứ của vụ việc vẫn thuộc booking.
 
@@ -86,9 +89,31 @@ Module trong khung: `inbox`, `email`, `templates`, `delivery`, `consumers`.
 - Cung cấp dấu vết thông báo để booking áp dụng các hạn nghiệm thu/bằng chứng; hợp đồng thời điểm bắt đầu timer phải được định nghĩa rõ trước khi thêm nghiệp vụ.
 - Không quyết định tự nghiệm thu, lỗi gia sư, điều kiện nhận tiền hay đóng vụ việc.
 
-### AI placeholder
+### Assessment service (dự kiến)
 
-Giữ `server/services/ai-service/README.md` làm nơi ghi phạm vi chờ đặc tả của AI Career Assistant/Gemini theo tài liệu kiến trúc. Chưa tạo service chạy, schema, route giao diện, quyền truy cập dữ liệu hoặc chức năng gợi ý gia sư. Không đưa LMS, SSO, skill-gap hay nghiệp vụ tuyển dụng từ ví dụ dự án khác vào khung này.
+Khảo thí là service con phục vụ dạy và học, làm đến mức 2 theo P16.
+
+- Sở hữu ngân hàng câu hỏi theo môn/cấp/chủ đề/độ khó, nguồn, người soạn/duyệt và phiên bản; câu AI sinh nháp chỉ dùng sau khi duyệt.
+- Sở hữu bài kiểm tra đầu kỳ, định kỳ, cuối kỳ do gia sư giao, lượt làm, điểm theo chủ đề và bảng điểm theo kỳ; nối lịch sử điểm khi gia hạn.
+- Đọc kỳ học và người tham gia từ booking qua API nội bộ để kiểm tra quyền giao bài/xem kết quả; không ghi database của booking.
+- Đề xuất (chưa áp dụng): điểm không ảnh hưởng nghiệm thu, tiền, EXP hay Hạng.
+
+### Care service (dự kiến)
+
+Chăm sóc khách hàng theo P18, dùng vai trò `SUPPORT`.
+
+- Sở hữu phiếu hỗ trợ và tin nhắn trong phiếu, FAQ, tầng chăm sóc 4 tầng, lý do xếp tầng, nhật ký liên hệ và việc cần làm của CSKH.
+- Job hằng ngày đọc tín hiệu từ booking (hủy, vắng, phản đối, vụ việc, gia hạn) và assessment (điểm) qua API nội bộ để xếp tầng.
+- CSKH tiếp nhận vụ việc, liên hệ gia sư mất liên lạc và đề xuất vi phạm người thuê; vụ việc và quyết định vẫn thuộc booking, admin kết luận.
+
+### AI service (dự kiến)
+
+Trợ lý AI mức 2 theo P17; mô tả trong `server/services/ai-service/README.md`.
+
+- Hỏi đáp dựa trên FAQ (từ care) và quy định đã duyệt, có dẫn nguồn; không chắc thì tạo phiếu ở care.
+- Trợ lý học tập: giải thích câu sai, gợi ý ôn tập, tóm tắt trình độ cho gia sư, sinh nháp câu hỏi cho assessment (bắt buộc duyệt).
+- Không tra dữ liệu riêng, không thao tác thay người dùng, không gửi liên hệ/thanh toán/bằng chứng sang nhà cung cấp mô hình. Nhà cung cấp chờ chốt.
+- Không phải thuật toán gợi ý hay xếp hạng gia sư. LMS/đăng ký khóa học, SSO và cổng tuyển dụng vẫn ngoài phạm vi.
 
 ## Trao đổi xuyên service
 
@@ -103,6 +128,10 @@ Các tên sự kiện/API phải được đặc tả khi triển khai; bảng n
 | Nhận xét | Booking cung cấp kỳ và thời điểm đủ điều kiện; tutor kiểm tra chủ đơn, hạn 14 ngày và tính duy nhất trước khi lưu. |
 | Vụ việc và hạn chế tài khoản | Booking lưu hồ sơ/quyết định; payment giữ hoặc xử lý tiền liên quan; tutor cập nhật EXP/Hạng nếu quyết định yêu cầu; identity áp dụng hạn chế truy cập. |
 | Thông báo có timer | Service nghiệp vụ yêu cầu thông báo; notification lưu kết quả gửi; service nghiệp vụ sở hữu timer, điều kiện hết hạn và hành động tiếp theo. |
+| Vụ việc qua CSKH | Booking giữ vụ việc, bằng chứng và quyết định; CSKH (vai trò `SUPPORT`) tiếp nhận, liên hệ, ghi nhật ký và đề xuất; chỉ admin kết luận, xử lý kháng nghị và ghi vi phạm. Phiếu ở care được chuyển thành vụ việc ở booking. |
+| Khảo thí theo kỳ | Booking cung cấp kỳ đã chốt và người tham gia; assessment lưu bài, lượt làm, điểm; ai giải thích câu sai và tóm tắt trình độ; care đọc điểm làm tín hiệu chăm sóc. |
+| Chăm sóc 4 tầng | Care đọc tín hiệu booking và assessment, xếp tầng; notification gửi tin hỏi thăm; CSKH gọi và ghi kết quả; đề xuất đổi gia sư/lịch hoặc đẩy vụ việc lên admin. |
+| Trợ lý AI | AI đọc FAQ từ care và quy định đã duyệt; không đọc dữ liệu riêng của người dùng; câu không trả lời được tạo phiếu ở care và vào danh sách bổ sung FAQ. |
 
 Mỗi service là chủ database riêng. Không giả định transaction chung xuyên database. Khi triển khai các luồng liên quan lịch/tiền/EXP, cần outbox, xử lý lặp an toàn và đối soát. Kafka không thay thế transaction bảo vệ lịch; Redis không phải nguồn quyết định lịch hoặc tiền.
 
@@ -136,6 +165,11 @@ Mỗi service là chủ database riêng. Không giả định transaction chung 
 | Admin | `/admin/cases`, `/admin/cases/[id]` | Tiếp nhận, xác minh, bằng chứng, thay gia sư, quyết định và kháng nghị. |
 | Admin | `/admin/payments`, `/admin/refunds`, `/admin/reconciliation`, `/admin/payouts` | Theo dõi tiền, hoàn/thu hồi, đối soát và chi mô phỏng. |
 | Admin | `/admin/reviews`, `/admin/reports`, `/admin/audit` | Ẩn/khôi phục nhận xét vi phạm, chỉ số và nhật ký truy vết. |
+| Admin | `/admin/question-bank` | Ngân hàng câu hỏi: soạn, nhập CSV/Excel, duyệt câu AI sinh nháp. |
+| Người thuê | `/learner/tests`, `/learner/tests/[id]`, `/learner/support` | Làm bài được giao, bảng điểm/tiến bộ, phiếu hỗ trợ. |
+| Gia sư | `/tutor/tests`, `/tutor/support` | Giao bài đầu kỳ/định kỳ/cuối kỳ, xem kết quả học sinh, phiếu hỗ trợ. |
+| CSKH | `/support`, `/support/tickets/[id]`, `/support/care`, `/support/cases` | Phiếu hỗ trợ, FAQ, danh sách tầng chăm sóc và việc trong ngày, tiếp nhận vụ việc (đề xuất, không kết luận). |
+| Mọi vai trò | Khung chat trợ lý AI | Hỏi đáp quy định/FAQ; với học sinh và gia sư thêm giải thích bài làm và tóm tắt trình độ. |
 
 Các thao tác xác nhận, checkout, đổi lịch, báo cáo, phản đối, gia hạn, viết nhận xét, nộp bằng chứng và kháng nghị có thể nằm trong trang chi tiết tương ứng. Không bắt buộc tạo page riêng cho từng nút thao tác. Không có vai trò hoặc khu vực giao diện thứ tư cho người học khác tài khoản Người thuê.
 
@@ -144,7 +178,7 @@ Các thao tác xác nhận, checkout, đổi lịch, báo cáo, phản đối, g
 - `mock/payment-provider/`: mô phỏng callback thanh toán thành công, hết hạn, tiền đến muộn, sai số tiền và callback lặp. Thêm kịch bản hoàn/chi giả khi triển khai các nghiệp vụ đó. Khi khung chưa có luồng tiền, chỉ cần ghi rõ giao diện và kịch bản dự kiến.
 - Mailpit: nhận email local từ notification; không cần thêm một email mock riêng.
 - Meet: gia sư lưu/cập nhật liên kết ở kế hoạch hoặc buổi học. Không cần mock Meet hoặc tích hợp API Meet trong phạm vi hiện tại.
-- Không cần LMS, SSO, skill-gap, recruitment mock hoặc mock cho chức năng Gemini chưa đặc tả.
+- Không cần LMS/đăng ký khóa học, SSO hoặc cổng tuyển dụng. Khảo thí, trợ lý AI và chăm sóc khách hàng làm theo P16–P18 ở mức 2.
 
 ## Bằng chứng, dữ liệu riêng và truy vết
 
@@ -169,8 +203,11 @@ Vụ đang mở phải giữ chứng cứ và lịch sử xử lý. Không xóa 
 11. **Người thuê distinct:** đếm tài khoản đứng tên có kỳ hoàn tất nghĩa vụ, không gọi là số học sinh; nhiều người học dùng cùng tài khoản vẫn là một Người thuê. Nhiều gia hạn cùng Người thuê vẫn có thể tạo nhiều lượt hợp lệ. Nguồn: luồng “Gia hạn” và bảng chỉ số; P09/P10.
 12. **Nhận xét:** chỉ kỳ `HOAN_TAT_NGHIA_VU` hoặc `KET_THUC_CO_HOAN_MOT_PHAN` mở quyền trong 14 ngày. Nhận xét chữ tự nguyện, không sao, không sửa và không đồng nghĩa thưởng EXP. Admin chỉ ẩn/khôi phục toàn nhận xét vi phạm, giữ bản gốc/lý do/người/thời điểm xử lý. Nguồn: bảng quyền và bảng bằng chứng; P07/P12.
 13. **Vụ việc và kháng nghị:** gia sư có 3 ngày/72 giờ nộp bằng chứng sau thông báo. Không nộp thì admin mặc định theo Người thuê trong phạm vi vụ; có bằng chứng phải đối chiếu hai phía. Giữ mở vụ/kỳ liên quan nếu nghĩa vụ hoặc kháng nghị còn tồn; không có hạn tổng buộc kết thúc, mốc rà soát 14 ngày không ép đóng. Nguồn: luồng “Đóng hoặc hủy kỳ”, “Khiếu nại và bằng chứng”, bảng bằng chứng; P07/P12/P14.
-14. **Mất liên lạc:** phạm vi các đơn/buổi có rủi ro do admin xác định và liệt kê kèm căn cứ; thời hạn 24 giờ/tối thiểu hai lần gọi theo P11. Không tự hủy toàn bộ dữ liệu của gia sư vì một vụ. Nguồn: luồng “Gia sư không thực hiện” và bảng quyền; P06/P11.
+14. **Mất liên lạc:** CSKH liên hệ tối thiểu hai lần trong 24 giờ và ghi lại; phạm vi các đơn/buổi có rủi ro do admin xác định và liệt kê kèm căn cứ theo P11. Không tự hủy toàn bộ dữ liệu của gia sư vì một vụ. Nguồn: luồng “Gia sư không thực hiện” và bảng quyền; P06/P11/P18.
+15. **CSKH đề xuất, admin kết luận:** CSKH tiếp nhận phiếu/vụ việc, liên hệ và đề xuất; chỉ admin kết luận vụ việc, xử lý kháng nghị, ghi vi phạm và quyết định tiền/Hạng/hồ sơ. CSKH chỉ xem dữ liệu của người đang có phiếu, vụ việc hoặc việc chăm sóc, mọi lần xem liên hệ có nhật ký. Nguồn: P18.
+16. **Trợ lý AI:** trả lời từ FAQ/quy định đã duyệt, có dẫn nguồn; không chắc thì chuyển phiếu; không tra dữ liệu riêng, không thao tác thay người dùng; không gửi liên hệ/thanh toán/bằng chứng sang nhà cung cấp; câu AI sinh nháp phải được duyệt trước khi vào bài kiểm tra. Nguồn: P16/P17.
+17. **Khảo thí:** gia sư chỉ giao bài và xem kết quả trong kỳ của mình; người thuê xem đơn mình đứng tên; không chép đề có bản quyền. Nguồn: P16.
 
 ## Những phần chưa được khung repo quyết định
 
-ERD, ràng buộc khóa lịch cụ thể, API và event schema, lịch chạy timer, cơ chế retry/outbox, cách chứng minh thông báo bắt đầu timer, lưu trữ file triển khai thật và đặc tả AI cần được thiết kế ở bước nghiệp vụ tương ứng. Bản đồ này xác định nơi sở hữu trách nhiệm; không thay thế các quyết định kỹ thuật hoặc kiểm thử của từng luồng.
+ERD, ràng buộc khóa lịch cụ thể, API và event schema, lịch chạy timer, cơ chế retry/outbox, cách chứng minh thông báo bắt đầu timer, lưu trữ file triển khai thật và nhà cung cấp mô hình AI (P17, chờ chốt) cần được thiết kế ở bước nghiệp vụ tương ứng. Bản đồ này xác định nơi sở hữu trách nhiệm; không thay thế các quyết định kỹ thuật hoặc kiểm thử của từng luồng.
