@@ -12,9 +12,9 @@ gia-su-platform/                              # Tên minh họa, không đổi w
 │   │   ├── booking-service/                 # :8083; learning_db
 │   │   ├── payment-service/                 # :8084; payment_db, tiền mô phỏng
 │   │   ├── notification-service/            # :8085; notification_db
-│   │   ├── assessment-service/              # README, khảo thí mức 2 (P16), chưa có ứng dụng
-│   │   ├── care-service/                    # README, chăm sóc khách hàng/CSKH (P18), chưa có ứng dụng
-│   │   └── ai-service/                      # README, trợ lý AI mức 2 (P17), chưa có ứng dụng
+│   │   ├── assessment-service/              # khảo thí mức 2 (P16), cổng 8086
+│   │   ├── care-service/                    # chăm sóc khách hàng/CSKH (P18), cổng 8087
+│   │   └── ai-service/                      # trợ lý AI mức 2 (P17), cổng 8089, chế độ truy xuất
 │   ├── libs/
 │   │   ├── common-core/                     # README; contract/helper khi cần
 │   │   └── common-observability/            # README; metrics/request ID khi cần
@@ -100,6 +100,9 @@ Mỗi app đang chạy có pom.xml, application entrypoint, SecurityConfig, appl
 | booking | connections, conversations, availability, plans, holds, periods, sessions, rescheduling, renewals, reports, makeup, cases, evidence, appeals |
 | payment | pricing, requests, callbacks, ledger, refunds, reconciliation, payouts, recoveries |
 | notification | inbox, email, templates, delivery, consumers |
+| assessment | questions, exams |
+| care | tickets, faq, tiers |
+| ai | assistant, learning |
 
 Thêm controller/service/repository/DTO/entity trong feature khi triển khai, không tạo lớp rỗng cho đủ tầng. Booking quản lý trọn vòng đời kỳ/buổi/vụ việc để giữ transaction lịch. Payment sở hữu giá/sổ tiền, tutor sở hữu uy tín từ kết quả nghiệp vụ hợp lệ.
 

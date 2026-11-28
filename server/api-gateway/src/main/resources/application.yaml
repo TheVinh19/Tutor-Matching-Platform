@@ -38,6 +38,24 @@ spring:
                 - Path=/api/v1/notifications/health
               filters:
                 - SetPath=/actuator/health
+            - id: assessment-health
+              uri: ${ASSESSMENT_SERVICE_URL:http://localhost:8086}
+              predicates:
+                - Path=/api/v1/assessments/health
+              filters:
+                - SetPath=/actuator/health
+            - id: care-health
+              uri: ${CARE_SERVICE_URL:http://localhost:8087}
+              predicates:
+                - Path=/api/v1/care/health
+              filters:
+                - SetPath=/actuator/health
+            - id: ai-health
+              uri: ${AI_SERVICE_URL:http://localhost:8089}
+              predicates:
+                - Path=/api/v1/ai/health
+              filters:
+                - SetPath=/actuator/health
             # Business APIs: forwarded unchanged; each service validates the JWT itself.
             # Health routes above are listed first so they win over these wildcards.
             - id: identity-api
@@ -56,6 +74,18 @@ spring:
               uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
               predicates:
                 - Path=/api/v1/notifications/**
+            - id: assessment-api
+              uri: ${ASSESSMENT_SERVICE_URL:http://localhost:8086}
+              predicates:
+                - Path=/api/v1/assessments/**
+            - id: care-api
+              uri: ${CARE_SERVICE_URL:http://localhost:8087}
+              predicates:
+                - Path=/api/v1/care/**
+            - id: ai-api
+              uri: ${AI_SERVICE_URL:http://localhost:8089}
+              predicates:
+                - Path=/api/v1/ai/**
 management:
   endpoints:
     web:

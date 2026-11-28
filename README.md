@@ -7,7 +7,7 @@ Xem [cây thư mục](docs/repository-layout.md), [kiến trúc](docs/architectu
 ## Cấu trúc
 
 - `server/api-gateway/`: cổng vào 8080.
-- `server/services/`: identity (8081), tutor (8082), booking (8083), payment (8084), notification (8085); ai chỉ có README.
+- `server/services/`: identity (8081), tutor (8082), booking (8083), payment (8084), notification (8085), assessment (8086), care (8087), ai (8089).
 - `server/libs/`: vị trí thư viện chung, chưa là Maven module.
 - `web/`: Next.js, React, TypeScript; ba khu vực Người thuê, Gia sư, Admin.
 - `mock/`: vị trí nhà cung cấp thanh toán giả lập, chưa có server chạy.
@@ -42,9 +42,16 @@ docker compose --env-file .env -f infra/compose.yaml --profile app up -d --build
 
 Chỉ xóa dữ liệu mới thêm, giữ dữ liệu demo (không trả lịch rảnh demo về mặc định): `cd infra; powershell -File postgres/clean-non-demo.ps1`.
 
-Tài khoản demo đăng nhập bằng email `admin@`, `tutor1@`, `tutor2@`, `learner1@`, `learner2@` + `demo.giasu.vn`, mật khẩu là `DEMO_PASSWORD` (mặc định `Demo@12345`).
+Tài khoản demo đăng nhập bằng email `admin@`, `support@` (nhân viên CSKH), `tutor1@`, `tutor2@`, `learner1@`, `learner2@` + `demo.giasu.vn`, mật khẩu là `DEMO_PASSWORD` (mặc định `Demo@12345`).
 
 Website qua Nginx: http://localhost:8088; web: http://localhost:3000; Mailpit: http://localhost:8025. Health mẫu: http://localhost:8088/api/v1/identity/health.
+
+Volume PostgreSQL tạo trước khi có assessment/care/ai chưa có `assessment_db`, `care_db`, `ai_db` (script khởi tạo chỉ chạy với volume mới). Tạo thêm mà không mất dữ liệu cũ (script chạy lại nhiều lần vẫn an toàn):
+
+```powershell
+docker compose --env-file .env -f infra/compose.yaml up -d postgres
+docker compose --env-file .env -f infra/compose.yaml exec -T postgres psql -U postgres -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/02-p16-p18.sql
+```
 
 Lần đầu cần tải image/dependency và chờ khởi động. Stack nhiều JVM cần đủ RAM; có thể chỉ bật hạ tầng và chạy service liên quan từ IDE. Các cổng local bind loopback, chưa phải cấu hình production.
 
@@ -55,7 +62,7 @@ Cần Java 25 (LTS), Maven 3.9+, Node.js 24 LTS (repo cũng chấp nhận Node 2
 ```powershell
 $env:DB_PASSWORD = 'local_account_change_me' # Khớp ACCOUNT_DB_PASSWORD trong .env
 $env:JWT_SECRET = 'local_jwt_secret_change_me_min_32_bytes' # Giống nhau ở mọi service, >= 32 byte
-$env:DEMO_PASSWORD = 'Demo@12345' # Chỉ identity: tạo 5 tài khoản demo
+$env:DEMO_PASSWORD = 'Demo@12345' # Chỉ identity: tạo 6 tài khoản demo
 mvn -f server/services/identity-service/pom.xml spring-boot:run
 ```
 
@@ -74,7 +81,7 @@ npm ci
 npm run dev
 ```
 
-Web (Next.js + Tailwind + shadcn/ui, theme trắng cam) giữ JWT trong cookie httpOnly: `/auth/login` đăng nhập và đặt cookie, `/bff/v1/...` gắn Bearer token rồi chuyển tới gateway `/api/v1/...`. `src/proxy.ts` chặn vào `/learner`, `/tutor`, `/admin` sai vai trò (chỉ phục vụ trải nghiệm; backend vẫn kiểm tra quyền). Đặt `DEMO_PASSWORD` cho web để trang `/login` có nút đăng nhập nhanh. Gateway mở health và API nghiệp vụ identity/tutors/bookings/notifications (xem [docs/api](docs/api/README.md)), chặn `/api/v1/*/internal/**` và API payment.
+Web (Next.js + Tailwind + shadcn/ui, theme trắng cam) giữ JWT trong cookie httpOnly: `/auth/login` đăng nhập và đặt cookie, `/bff/v1/...` gắn Bearer token rồi chuyển tới gateway `/api/v1/...`. `src/proxy.ts` chặn vào `/learner`, `/tutor`, `/admin` sai vai trò (chỉ phục vụ trải nghiệm; backend vẫn kiểm tra quyền). Đặt `DEMO_PASSWORD` cho web để trang `/login` có nút đăng nhập nhanh. Gateway mở health và API nghiệp vụ identity/tutors/bookings/notifications/assessments/care/ai (xem [docs/api](docs/api/README.md)), chặn `/api/v1/*/internal/**` và API payment.
 
 ## Đăng nhập demo (mock)
 

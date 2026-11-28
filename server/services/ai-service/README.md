@@ -12,4 +12,4 @@ Nhà cung cấp mô hình chưa chốt (Gemini đang cân nhắc), nên bản n�
 
 Khi chốt nhà cung cấp: giữ bộ quy định và FAQ làm nguồn dẫn chứng, thay phần so khớp bằng mô hình; thêm sinh nháp câu hỏi cho ngân hàng (bắt buộc người duyệt).
 
-API: xem [docs/api](../../../docs/api/README.md#ai-service). Bản đồ: [domain-map](../../../docs/architecture/domain-map.md).
+API: xem [docs/api](../../../docs/api/README.md#ai). Bản đồ: [domain-map](../../../docs/architecture/domain-map.md).

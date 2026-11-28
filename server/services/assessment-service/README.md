@@ -8,4 +8,4 @@ Khảo thí mức 2 theo P16 trong `Tai lieu/Yeu_cau_du_an_gia_su.docx`. Cổng 
 - Đọc kỳ học từ booking qua API nội bộ; cung cấp kết quả, bảng điểm cho ai-service và tín hiệu điểm cho care-service.
 - Ngoài phạm vi: lộ trình mẫu, đăng ký theo khóa học, LMS; sinh nháp câu hỏi bằng AI chờ chốt nhà cung cấp mô hình.
 
-API: xem [docs/api](../../../docs/api/README.md#assessment-service). Bản đồ: [domain-map](../../../docs/architecture/domain-map.md).
+API: xem [docs/api](../../../docs/api/README.md#assessment). Bản đồ: [domain-map](../../../docs/architecture/domain-map.md).

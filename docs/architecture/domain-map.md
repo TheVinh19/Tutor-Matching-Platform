@@ -24,9 +24,9 @@ Các quy tắc đã thống nhất trong tài liệu nghiệp vụ. Cách chia s
 | `server/services/booking-service/` | Kết nối/trao đổi, lịch trống, kế hoạch, giữ lịch, kỳ học, buổi học và vụ việc. |
 | `server/services/payment-service/` | Giá, QR mô phỏng, giao dịch, sổ tiền, hoàn/thu hồi/chi mô phỏng. |
 | `server/services/notification-service/` | Thông báo web, email và lịch sử gửi. |
-| `server/services/assessment-service/` | Chỉ có README: khảo thí mức 2 theo P16 — ngân hàng câu hỏi, bài đầu kỳ/định kỳ/cuối kỳ, chấm tự động, bảng điểm. |
-| `server/services/care-service/` | Chỉ có README: chăm sóc khách hàng theo P18 — phiếu hỗ trợ, FAQ, tầng chăm sóc, nhật ký liên hệ. |
-| `server/services/ai-service/` | Chỉ có README: trợ lý AI mức 2 theo P17; chưa có ứng dụng chạy hoặc API nghiệp vụ. |
+| `server/services/assessment-service/` | Khảo thí mức 2 theo P16 (cổng 8086): ngân hàng câu hỏi, nhập CSV, bài đầu vào/định kỳ/cuối kỳ, chấm tự động, bảng điểm nối qua gia hạn. |
+| `server/services/care-service/` | Chăm sóc khách hàng theo P18 (cổng 8087): phiếu hỗ trợ, FAQ, tầng chăm sóc 4 tầng, việc cần gọi, nhật ký liên hệ. |
+| `server/services/ai-service/` | Trợ lý AI mức 2 theo P17 (cổng 8089), chế độ truy xuất tới khi chốt nhà cung cấp mô hình. |
 | `web/src/app/` | Next.js App Router cho giao diện công khai và các vai trò Người thuê, Gia sư, Nhân viên CSKH, Admin. |
 | `mock/` | Giả lập nhà cung cấp thanh toán và callback khi triển khai luồng tiền. |
 | `infra/` | Hạ tầng local, cấu hình chạy, database, Kafka, Redis, Mailpit và volume. |
@@ -89,7 +89,7 @@ Module trong khung: `inbox`, `email`, `templates`, `delivery`, `consumers`.
 - Cung cấp dấu vết thông báo để booking áp dụng các hạn nghiệm thu/bằng chứng; hợp đồng thời điểm bắt đầu timer phải được định nghĩa rõ trước khi thêm nghiệp vụ.
 - Không quyết định tự nghiệm thu, lỗi gia sư, điều kiện nhận tiền hay đóng vụ việc.
 
-### Assessment service (dự kiến)
+### Assessment service
 
 Khảo thí là service con phục vụ dạy và học, làm đến mức 2 theo P16.
 
@@ -98,7 +98,7 @@ Khảo thí là service con phục vụ dạy và học, làm đến mức 2 the
 - Đọc kỳ học và người tham gia từ booking qua API nội bộ để kiểm tra quyền giao bài/xem kết quả; không ghi database của booking.
 - Đề xuất (chưa áp dụng): điểm không ảnh hưởng nghiệm thu, tiền, EXP hay Hạng.
 
-### Care service (dự kiến)
+### Care service
 
 Chăm sóc khách hàng theo P18, dùng vai trò `SUPPORT`.
 
@@ -106,12 +106,13 @@ Chăm sóc khách hàng theo P18, dùng vai trò `SUPPORT`.
 - Job hằng ngày đọc tín hiệu từ booking (hủy, vắng, phản đối, vụ việc, gia hạn) và assessment (điểm) qua API nội bộ để xếp tầng.
 - CSKH tiếp nhận vụ việc, liên hệ gia sư mất liên lạc và đề xuất vi phạm người thuê; vụ việc và quyết định vẫn thuộc booking, admin kết luận.
 
-### AI service (dự kiến)
+### AI service
 
 Trợ lý AI mức 2 theo P17; mô tả trong `server/services/ai-service/README.md`.
 
 - Hỏi đáp dựa trên FAQ (từ care) và quy định đã duyệt, có dẫn nguồn; không chắc thì tạo phiếu ở care.
-- Trợ lý học tập: giải thích câu sai, gợi ý ôn tập, tóm tắt trình độ cho gia sư, sinh nháp câu hỏi cho assessment (bắt buộc duyệt).
+- Trợ lý học tập: giải thích câu sai, gợi ý ôn tập, tóm tắt trình độ cho gia sư. Sinh nháp câu hỏi cho assessment (bắt buộc duyệt) làm khi chốt nhà cung cấp.
+- Hiện chạy chế độ truy xuất: so khớp câu hỏi với bộ quy định có sẵn và FAQ, dưới ngưỡng thì không đoán; giới hạn 30 câu/người/ngày; che số điện thoại/email trước khi lưu.
 - Không tra dữ liệu riêng, không thao tác thay người dùng, không gửi liên hệ/thanh toán/bằng chứng sang nhà cung cấp mô hình. Nhà cung cấp chờ chốt.
 - Không phải thuật toán gợi ý hay xếp hạng gia sư. LMS/đăng ký khóa học, SSO và cổng tuyển dụng vẫn ngoài phạm vi.
 

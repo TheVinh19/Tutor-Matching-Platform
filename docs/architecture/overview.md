@@ -12,12 +12,12 @@
 | booking-service | 8083 | learning_db / learning_app |
 | payment-service | 8084 | payment_db / payment_app |
 | notification-service | 8085 | notification_db / notification_app |
-| assessment-service | Chưa cấp | Chưa có ứng dụng; khảo thí mức 2 theo P16 |
-| care-service | Chưa cấp | Chưa có ứng dụng; chăm sóc khách hàng và vai trò CSKH theo P18 |
-| ai-service | Chưa cấp | Chỉ có README; trợ lý AI mức 2 theo P17 |
+| assessment-service | 8086 | assessment_db / assessment_app |
+| care-service | 8087 | care_db / care_app |
+| ai-service | 8089 | ai_db / ai_app (chế độ truy xuất, chưa gọi mô hình ngoài) |
 | web | 3000 | Không sở hữu dữ liệu nghiệp vụ |
 
-Cổng 8081–8085 là cổng mặc định của ứng dụng khi chạy local. Trong Compose, các service này chỉ được truy cập qua mạng nội bộ và gateway. Nginx local dùng cổng 8088.
+Cổng 8081–8089 là cổng mặc định của ứng dụng khi chạy local. Trong Compose, các service này chỉ được truy cập qua mạng nội bộ và gateway. Nginx local dùng cổng 8088.
 
 Đổi tên service vẫn giữ database, DB username và biến môi trường legacy. Mỗi service sở hữu database và migration Flyway riêng; local dùng chung một PostgreSQL instance. Không đổi hoặc xóa volume để đồng bộ tên.
 
