@@ -16,6 +16,8 @@ export type TutorProfile = {
 export type PublicTutor = Pick<TutorProfile, "accountId" | "fullName" | "bio" | "experience" | "teachingMode" | "rank" | "subjects" | "areaCodes"> & {
   /** Only on the profile endpoint, not in search results. completionRate null = no data yet. */
   taughtSessions?: number; completionRate?: number | null; tutorFaultFailed?: number;
+  /** Approved YouTube links; newcomer = within 30 days of the first approval. */
+  videos?: string[]; newcomer?: boolean;
 };
 export type SearchPage = { items: PublicTutor[]; page: number; size: number; total: number };
 export type Review = { id: string; planId: string; content: string; createdAt: string; reply: string | null; repliedAt: string | null };
@@ -56,7 +58,29 @@ export type Plan = {
   renewedFrom: string | null; renewalQualifiedAt: string | null;
 };
 export type SessionStatus = "HELD" | "SCHEDULED" | "IN_PROGRESS" | "CANCEL_REPORTED" | "COMPLETED_PENDING_CONFIRM" | "CONFIRMED" | "DISPUTED"
-  | "LEARNER_ABSENT_PENDING" | "LEARNER_ABSENT" | "TUTOR_ABSENT_REPORTED" | "CANCELLED" | "RELEASED";
+  | "LEARNER_ABSENT_PENDING" | "LEARNER_ABSENT" | "TUTOR_ABSENT_REPORTED" | "FAILED_TUTOR" | "CANCELLED" | "RELEASED";
+
+export type CaseOutcome = "TUTOR_FAULT" | "LEARNER_WRONG" | "NO_FAULT";
+export type CaseInfo = {
+  id: string; sessionId: string; planId: string; learnerId: string; tutorId: string; kind: "DISPUTE" | "TUTOR_ABSENT";
+  status: "OPEN" | "DECIDED" | "APPEALED"; reason: string; evidenceDeadline: string; outcome: CaseOutcome | null;
+  decisionReason: string | null; decidedBy: string | null; decidedAt: string | null; createdAt: string; updatedAt: string;
+};
+export type CaseEvidence = { id: number; submittedBy: string; party: "LEARNER" | "TUTOR"; url: string; note: string | null; createdAt: string };
+export type CaseEvent = { action: "OPENED" | "DECIDED" | "APPEALED"; actorId: string | null; note: string | null; createdAt: string };
+export type CaseDetail = { caseInfo: CaseInfo; session: Session; evidence: CaseEvidence[]; events: CaseEvent[]; suggestedOutcome: CaseOutcome | null };
+export type Strike = {
+  id: number; kind: "SELF_CANCEL" | "NO_SHOW" | "FALSE_COMPLAINT"; caseId: string | null; sessionId: string | null; reason: string;
+  restrictedUntil: string | null; revokedAt: string | null; createdAt: string;
+};
+export type Restriction = { activeStrikes: number; restrictedUntil: string | null; strikes: Strike[] };
+
+export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type TutorVideo = { id: string; accountId: string; url: string; status: ReviewStatus; rejectReason: string | null; reviewedAt: string | null; createdAt: string };
+export type SubjectItem = { accountId: string; subjectCode: string; levelCode: string; status: ReviewStatus; rejectReason: string | null };
+export type TutorEvidence = { id: number; kind: "DEGREE" | "EXPERIENCE"; url: string; note: string | null; createdAt: string };
+export type ProfileExtras = { videos: TutorVideo[]; subjectRequests: SubjectItem[]; evidence: TutorEvidence[] };
+export type ReviewQueue = { videos: TutorVideo[]; subjects: SubjectItem[] };
 export type Session = {
   id: string; planId: string; tutorId: string; learnerId: string; startAt: string; endAt: string; status: SessionStatus;
   meetLink: string | null; cancelReason: string | null; cancelledBy: string | null; cancelledAt: string | null;

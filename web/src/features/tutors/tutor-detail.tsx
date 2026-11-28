@@ -31,8 +31,24 @@ export function TutorDetail({ id, role }: { id: string; role: Role | null }) {
           <div className="mt-2 flex flex-wrap gap-1.5">
             <Badge>Hạng {tutor.rank}</Badge>
             <Badge variant="outline">{MODE_LABEL[tutor.teachingMode]}</Badge>
+            {tutor.newcomer && <Badge variant="secondary">Mới tham gia</Badge>}
           </div>
         </div>
+        {tutor.videos && tutor.videos.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle>Video dạy minh họa</CardTitle></CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              {tutor.videos.map((url) => {
+                const id = /(?:v=|youtu\.be\/)([\w-]{11})/.exec(url)?.[1];
+                return id ? (
+                  <iframe key={url} className="aspect-video w-full rounded-md" src={`https://www.youtube-nocookie.com/embed/${id}`}
+                    title={`Video dạy minh họa của ${tutor.fullName}`} loading="lazy" allowFullScreen
+                    allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" />
+                ) : <a key={url} href={url} target="_blank" rel="noreferrer" className="text-primary hover:underline">{url}</a>;
+              })}
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardHeader><CardTitle>Giới thiệu</CardTitle></CardHeader>
           <CardContent className="grid gap-3 text-sm">

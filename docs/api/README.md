@@ -52,7 +52,17 @@ Mọi API đi qua gateway `:8080` (hoặc Nginx `:8088`), prefix `/api/v1/<khu>`
 | POST | `/api/v1/tutors/admin/ranks/{id}/penalties` | ADMIN | `{points:30\|100\|200,reason,refType:SESSION\|PLAN,refId}`; một phạt/ref (`409 PENALTY_EXISTS`) |
 | GET | `/api/v1/tutors/internal/profiles/{id}` | SERVICE | trạng thái duyệt, hình thức, Hạng, môn/cấp |
 
-Duyệt hồ sơ `POST /api/v1/tutors/admin/profiles/{id}/approve` nhận thêm `entryRank2: true` để xếp Hạng 2 đầu vào (+1.200 EXP khởi tạo). Hồ sơ công khai `GET /api/v1/tutors/{id}` có thêm `taughtSessions`, `completionRate` (null = chưa có dữ liệu), `tutorFaultFailed`; nhận xét công khai có `reply`, `repliedAt`.
+| GET | `/api/v1/tutors/me/extras` | TUTOR | `{videos,subjectRequests,evidence}` (admin: `/admin/profiles/{id}/extras`) |
+| POST | `/api/v1/tutors/me/videos` | TUTOR | `{url}` link YouTube; tối đa 3 chưa bị từ chối (`409 VIDEO_LIMIT`) |
+| POST | `/api/v1/tutors/me/subjects` | TUTOR (hồ sơ APPROVED) | `{subjectCode,levelCode}` → chờ duyệt riêng (`409 SUBJECT_EXISTS`) |
+| POST | `/api/v1/tutors/me/evidence` | TUTOR | `{kind: DEGREE\|EXPERIENCE, url, note?}` minh chứng Hạng 2 đầu vào |
+| GET | `/api/v1/tutors/admin/review-queue` | ADMIN | video và môn đang chờ duyệt |
+| POST | `/api/v1/tutors/admin/videos/{id}/approve` · `/reject` | ADMIN | reject cần `{reason}` |
+| POST | `/api/v1/tutors/admin/subjects/approve` · `/reject` | ADMIN | `{accountId,subjectCode,levelCode,reason?}` (reject cần reason) |
+
+Tìm kiếm và hồ sơ công khai chỉ hiện gia sư có ít nhất 1 video đã duyệt và chỉ dùng môn đã duyệt; hồ sơ công khai có `videos`, `newcomer` (30 ngày từ lần duyệt đầu). Hồ sơ nội bộ cho booking có `rankUnderReview`.
+
+Duyệt hồ sơ `POST /api/v1/tutors/admin/profiles/{id}/approve` nhận thêm `entryRank2: true` để xếp Hạng 2 đầu vào (+1.200 EXP khởi tạo); cần đủ minh chứng hai nhóm, nếu không `409 EVIDENCE_REQUIRED`. Hồ sơ công khai `GET /api/v1/tutors/{id}` có thêm `taughtSessions`, `completionRate` (null = chưa có dữ liệu), `tutorFaultFailed`; nhận xét công khai có `reply`, `repliedAt`.
 
 ## Booking
 
@@ -92,6 +102,15 @@ Duyệt hồ sơ `POST /api/v1/tutors/admin/profiles/{id}/approve` nhận thêm 
 | POST | `/api/v1/bookings/sessions/{id}/confirm` | LEARNER chủ đơn | COMPLETED_PENDING_CONFIRM → CONFIRMED; LEARNER_ABSENT_PENDING → LEARNER_ABSENT. Sau đó xét đóng kỳ |
 | POST | `/api/v1/bookings/sessions/{id}/dispute` | LEARNER chủ đơn | `{reason}` trong 24h (chờ xác nhận hoặc báo vắng) → DISPUTED |
 | GET | `/api/v1/bookings/admin/plans?status=` | ADMIN | 100 kế hoạch mới nhất |
+| GET | `/api/v1/bookings/cases/me` · `/cases/{id}` · `/sessions/{id}/case` | 2 bên (chi tiết: cả ADMIN) | Vụ việc mở tự động khi buổi DISPUTED/TUTOR_ABSENT_REPORTED. Chi tiết: `{caseInfo,session,evidence,events,suggestedOutcome}`; `suggestedOutcome=TUTOR_FAULT` khi quá 72h gia sư chưa nộp bằng chứng |
+| POST | `/api/v1/bookings/cases/{id}/evidence` | 2 bên | `{urls[1..5] https, note?}`; gia sư trong 72h khi OPEN (`409 EVIDENCE_WINDOW_CLOSED`), không hạn khi APPEALED; không nộp khi DECIDED |
+| POST | `/api/v1/bookings/cases/{id}/appeal` | 2 bên | `{reason}`; DECIDED → APPEALED, không giới hạn số lần |
+| GET | `/api/v1/bookings/admin/cases?status=OPEN\|DECIDED\|APPEALED` | ADMIN | |
+| POST | `/api/v1/bookings/admin/cases/{id}/decide` | ADMIN | `{outcome: TUTOR_FAULT\|LEARNER_WRONG\|NO_FAULT, reason}`; buổi → FAILED_TUTOR / CONFIRMED (+ vi phạm FALSE_COMPLAINT) / CANCELLED; xét lại sau kháng nghị thu hồi vi phạm cũ; sau đó xét đóng kỳ |
+| GET/POST | `/api/v1/bookings/admin/learners/{id}/strikes` | ADMIN | POST `{kind: SELF_CANCEL\|NO_SHOW, reason, sessionId?}`; vi phạm thứ 3 trong 90 ngày khóa tạo kế hoạch mới 30 ngày |
+| GET | `/api/v1/bookings/me/restriction` | LEARNER | `{activeStrikes,restrictedUntil,strikes}` |
+
+Tạo kế hoạch (cả gia hạn) trả `409 LEARNER_RESTRICTED` khi người thuê đang bị khóa; tạo kế hoạch và propose trả `409 RANK_UNDER_REVIEW` khi gia sư mất điều kiện giữ Hạng (cờ từ tutor-service).
 | GET | `/api/v1/bookings/internal/availability/tutors` | SERVICE | dùng cho lọc lịch khi tìm kiếm |
 | GET | `/api/v1/bookings/internal/plans/{id}/review-eligibility` | SERVICE | dùng cho nhận xét |
 | GET | `/api/v1/bookings/internal/tutors/{tutorId}/exp-sources` | SERVICE | sự kiện EXP (+10 buổi CONFIRMED bắt đầu đúng phút, +30 kỳ HOAN_TAT_NGHIA_VU, +50 gia hạn hợp lệ, mỗi sự kiện một `key`) và số liệu xét Hạng |

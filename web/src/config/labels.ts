@@ -1,4 +1,4 @@
-import type { ExpEntry, Mode, PlanStatus, ProfileStatus, RankFlag, SessionStatus } from "@/types/api";
+import type { CaseInfo, CaseOutcome, ExpEntry, Mode, PlanStatus, ProfileStatus, RankFlag, ReviewStatus, SessionStatus, Strike } from "@/types/api";
 
 type Tone = "default" | "secondary" | "outline" | "destructive";
 
@@ -20,7 +20,7 @@ export const SESSION_STATUS: Record<SessionStatus, [string, Tone]> = {
   CANCEL_REPORTED: ["Báo bận/hủy – chờ xử lý", "destructive"],
   COMPLETED_PENDING_CONFIRM: ["Chờ xác nhận", "secondary"], CONFIRMED: ["Đã xác nhận", "outline"], DISPUTED: ["Bị phản đối", "destructive"],
   LEARNER_ABSENT_PENDING: ["Gia sư báo học sinh vắng", "destructive"], LEARNER_ABSENT: ["Học sinh vắng", "outline"],
-  TUTOR_ABSENT_REPORTED: ["Báo gia sư vắng", "destructive"],
+  TUTOR_ABSENT_REPORTED: ["Báo gia sư vắng", "destructive"], FAILED_TUTOR: ["Thất bại do gia sư", "destructive"],
   CANCELLED: ["Đã hủy", "outline"], RELEASED: ["Đã giải phóng", "outline"],
 };
 export const RANK_LABEL = ["", "Hạng 1 · Cơ bản", "Hạng 2 · Kinh nghiệm", "Hạng 3 · Chuyên gia"];
@@ -33,6 +33,17 @@ export const EXP_TYPE: Record<ExpEntry["type"], string> = {
 };
 /** Rank completion rate; P12: no sample shows "chưa có dữ liệu". */
 export const fmtRate = (rate: number | null | undefined) => (rate == null ? "Chưa có dữ liệu" : `${Math.round(rate * 1000) / 10}%`);
-export const PARTY_LABEL ={ LEARNER: "Học sinh", TUTOR: "Gia sư" } as const;
+export const CASE_STATUS: Record<CaseInfo["status"], [string, Tone]> = {
+  OPEN: ["Đang xử lý", "secondary"], DECIDED: ["Đã kết luận", "outline"], APPEALED: ["Đang kháng nghị", "destructive"],
+};
+export const CASE_KIND: Record<CaseInfo["kind"], string> = { DISPUTE: "Phản đối buổi học", TUTOR_ABSENT: "Gia sư không dạy" };
+export const OUTCOME_LABEL: Record<CaseOutcome, string> = {
+  TUTOR_FAULT: "Lỗi gia sư", LEARNER_WRONG: "Người thuê khiếu nại sai", NO_FAULT: "Không lỗi bên nào",
+};
+export const STRIKE_LABEL: Record<Strike["kind"], string> = { SELF_CANCEL: "Tự ý hủy", NO_SHOW: "Vắng không báo", FALSE_COMPLAINT: "Khiếu nại sai" };
+export const REVIEW_STATUS: Record<ReviewStatus, [string, Tone]> = {
+  PENDING: ["Chờ duyệt", "secondary"], APPROVED: ["Đã duyệt", "default"], REJECTED: ["Bị từ chối", "destructive"],
+};
+export const PARTY_LABEL = { LEARNER: "Học sinh", TUTOR: "Gia sư" } as const;
 /** Periods that are over normally: contact stays visible, the learner may review within 14 days. */
 export const CLOSED_PLAN: PlanStatus[] = ["HOAN_TAT_NGHIA_VU", "KET_THUC_CO_HOAN_MOT_PHAN"];

@@ -8,6 +8,7 @@ import { ErrorBox, ReasonAction, StatusBadge, useAction } from "@/components/com
 import { PARTY_LABEL, SESSION_STATUS } from "@/config/labels";
 import { api, fmtClock, fmtDateTime } from "@/lib/api";
 import { RescheduleBox } from "@/features/booking/reschedule-box";
+import { CaseBox } from "@/features/disputes/case-box";
 import type { Session } from "@/types/api";
 
 type Role = "LEARNER" | "TUTOR";
@@ -22,6 +23,8 @@ export function SessionCard({ session: s, role, onChange }: { session: Session; 
     await api(`/v1/bookings/sessions/${s.id}/${action}`, { method: "POST", body });
     onChange();
   });
+  const [showCase, setShowCase] = useState(false);
+  const hasCase = s.status === "DISPUTED" || s.status === "TUTOR_ABSENT_REPORTED" || s.status === "FAILED_TUTOR" || s.disputeReason !== null;
   const [endEarly, setEndEarly] = useState(false);
   const [earlyBy, setEarlyBy] = useState<"LEARNER" | "TUTOR">("LEARNER");
   const [earlyNote, setEarlyNote] = useState("");
@@ -124,6 +127,12 @@ export function SessionCard({ session: s, role, onChange }: { session: Session; 
         </form>
       )}
       {s.status === "CANCEL_REPORTED" && <RescheduleBox session={s} role={role} onDone={onChange} />}
+      {(hasCase || s.absentNote !== null && s.status !== "LEARNER_ABSENT_PENDING" && s.status !== "LEARNER_ABSENT") && (
+        <button type="button" className="w-fit text-sm text-primary hover:underline" onClick={() => setShowCase(!showCase)}>
+          {showCase ? "Ẩn vụ việc" : "Xem vụ việc / nộp bằng chứng"}
+        </button>
+      )}
+      {showCase && <CaseBox path={`/v1/bookings/sessions/${s.id}/case`} viewer={role} onChange={onChange} />}
       {editLink && (
         <form className="flex flex-wrap gap-2" onSubmit={async (e) => {
           e.preventDefault();

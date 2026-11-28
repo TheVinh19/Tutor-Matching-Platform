@@ -9,7 +9,7 @@ const NAV: Record<Role, [string, string][]> = {
   LEARNER: [["/learner", "Tổng quan"], ["/learner/schedule", "Lịch học"], ["/tutors", "Tìm gia sư"], ["/learner/notifications", "Thông báo"]],
   TUTOR: [["/tutor", "Tổng quan"], ["/tutor/profile", "Hồ sơ"], ["/tutor/availability", "Lịch rảnh"], ["/tutor/schedule", "Lịch dạy"],
     ["/tutor/rank", "EXP & Hạng"], ["/tutor/reviews", "Nhận xét"], ["/tutor/notifications", "Thông báo"]],
-  ADMIN: [["/admin", "Duyệt hồ sơ"], ["/admin/ranks", "Xét Hạng"], ["/admin/reviews", "Nhận xét"], ["/tutors", "Xem gia sư"]],
+  ADMIN: [["/admin", "Duyệt hồ sơ"], ["/admin/ranks", "Xét Hạng"], ["/admin/reviews", "Nhận xét"], ["/admin/cases", "Vụ việc"], ["/tutors", "Xem gia sư"]],
 };
 const ROLE_LABEL: Record<Role, string> = { LEARNER: "Học sinh", TUTOR: "Gia sư", ADMIN: "Quản trị" };
 
