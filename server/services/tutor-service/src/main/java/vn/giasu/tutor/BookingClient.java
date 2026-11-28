@@ -20,6 +20,18 @@ import vn.giasu.common.web.ApiException;
 @Component
 public class BookingClient {
     public record PlanEligibility(UUID planId, UUID learnerId, UUID tutorId, String status, Instant closedAt) {}
+    /** One qualifying fact for EXP; key is unique per tutor (session:/period:/renewal: + id). */
+    public record ExpEvent(String key, String type, int points, String refType, UUID refId, Instant occurredAt) {}
+    public record ExpStats(int taughtSessions, int tutorFaultFailed, int distinctLearners, int renewals, int openIssues) {}
+    public record ExpSources(List<ExpEvent> events, ExpStats stats) {}
+
+    public ExpSources expSources(UUID tutorId) {
+        try {
+            return client.get().uri("/api/v1/bookings/internal/tutors/{id}/exp-sources", tutorId).retrieve().body(ExpSources.class);
+        } catch (RestClientException e) {
+            throw unavailable();
+        }
+    }
 
     private final RestClient client;
 

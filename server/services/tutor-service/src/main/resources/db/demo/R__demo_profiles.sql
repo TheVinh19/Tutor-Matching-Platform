@@ -24,3 +24,10 @@ WHERE NOT EXISTS (SELECT 1 FROM approval_history WHERE account_id = '00000000-00
 INSERT INTO approval_history (account_id, action, reason, actor_id)
 SELECT '00000000-0000-0000-0000-000000000002', 'APPROVE', 'Dữ liệu demo', '00000000-0000-0000-0000-000000000001'
 WHERE NOT EXISTS (SELECT 1 FROM approval_history WHERE account_id = '00000000-0000-0000-0000-000000000002');
+
+-- P12: tutor1 is public only with an approved teaching video.
+INSERT INTO tutor_videos (id, account_id, url, status, reviewed_by, reviewed_at)
+SELECT '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-000000000002', 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
+       'APPROVED', '00000000-0000-0000-0000-000000000001', now()
+WHERE EXISTS (SELECT 1 FROM tutor_profiles WHERE account_id = '00000000-0000-0000-0000-000000000002')
+ON CONFLICT (id) DO NOTHING;

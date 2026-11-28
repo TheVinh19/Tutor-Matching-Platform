@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import vn.giasu.common.web.ApiException;
+import vn.giasu.tutor.experience.ExpLedger;
 import vn.giasu.tutor.profiles.ProfileStore;
 import vn.giasu.tutor.profiles.ProfileStore.HistoryEntry;
 import vn.giasu.tutor.profiles.ProfileStore.Profile;
@@ -28,12 +30,19 @@ import vn.giasu.tutor.profiles.ProfileStore.Status;
 @PreAuthorize("hasRole('ADMIN')")
 class AdminProfileController {
     record RejectRequest(@NotBlank @Size(max = 1000) String reason) {}
-    record ApproveRequest(@Size(max = 1000) String note) {}
+    /** entryRank2: P09 entry exception, the admin places the tutor at rank 2 with 1,200 starting EXP (evidence checked by the admin). */
+    record ApproveRequest(@Size(max = 1000) String note, Boolean entryRank2) {}
     record ProfileDetail(Profile profile, List<HistoryEntry> history) {}
 
     private final ProfileStore store;
+    private final JdbcClient jdbc;
+    private final ExpLedger ledger;
 
-    AdminProfileController(ProfileStore store) { this.store = store; }
+    AdminProfileController(ProfileStore store, JdbcClient jdbc, ExpLedger ledger) {
+        this.store = store;
+        this.jdbc = jdbc;
+        this.ledger = ledger;
+    }
 
     @GetMapping
     List<Profile> list(@RequestParam(defaultValue = "PENDING") Status status) {
@@ -50,7 +59,24 @@ class AdminProfileController {
     @PostMapping("/{accountId}/approve")
     @Transactional
     ProfileDetail approve(@PathVariable UUID accountId, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody(required = false) ApproveRequest request) {
-        return decide(accountId, Status.APPROVED, jwt, request == null ? null : request.note());
+        if (request != null && Boolean.TRUE.equals(request.entryRank2())) {
+            // Rank 2 entry needs both evidence groups: degree/certificate and at least one year of teaching experience.
+            long groups = jdbc.sql("SELECT count(DISTINCT kind) FROM tutor_evidence WHERE account_id = ?").param(accountId).query(Long.class).single();
+            if (groups < 2) {
+                throw new ApiException(HttpStatus.CONFLICT, "EVIDENCE_REQUIRED", "Hạng 2 đầu vào cần đủ minh chứng bằng cấp và kinh nghiệm ≥ 1 năm");
+            }
+        }
+        ProfileDetail approved = decide(accountId, Status.APPROVED, jwt, request == null ? null : request.note());
+        if (request != null && Boolean.TRUE.equals(request.entryRank2()) && approved.profile().rank() == 1) {
+            UUID admin = UUID.fromString(jwt.getSubject());
+            jdbc.sql("UPDATE tutor_profiles SET rank = 2, entry_rank2 = true, rank_since = now(), updated_at = now() WHERE account_id = ?")
+                    .param(accountId).update();
+            ledger.add(accountId, "initial", "INITIAL", 1200, null, null, "Hạng 2 đầu vào", admin, null);
+            jdbc.sql("INSERT INTO rank_decisions (account_id, from_rank, to_rank, reason, actor_id) VALUES (?, 1, 2, ?, ?)")
+                    .params(accountId, request.note() == null || request.note().isBlank() ? "Hạng 2 đầu vào" : request.note().strip(), admin).update();
+            return detail(accountId);
+        }
+        return approved;
     }
 
     @PostMapping("/{accountId}/reject")

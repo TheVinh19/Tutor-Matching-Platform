@@ -15,7 +15,9 @@ import vn.giasu.common.web.ApiException;
 @Component
 public class TutorClient {
     public record SubjectLevel(String subjectCode, String levelCode) {}
-    public record TutorProfile(UUID accountId, String fullName, String status, String teachingMode, int rank, List<SubjectLevel> subjects) {}
+    /** subjects: approved ones only. rankUnderReview: lost a rank condition, no new plans until the admin decides (P09). */
+    public record TutorProfile(UUID accountId, String fullName, String status, String teachingMode, int rank, List<SubjectLevel> subjects,
+                               boolean rankUnderReview) {}
 
     private final RestClient client;
 

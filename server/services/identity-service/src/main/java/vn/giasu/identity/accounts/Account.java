@@ -12,13 +12,15 @@ import java.util.UUID;
 @Entity
 @Table(name = "accounts")
 public class Account {
-    public enum Role { LEARNER, TUTOR, ADMIN }
+    /** SUPPORT: customer care staff (P18), created by an admin, never through public sign-up. */
+    public enum Role { LEARNER, TUTOR, ADMIN, SUPPORT }
     public enum Status { ACTIVE, RESTRICTED }
 
     @Id
     private UUID id;
     private String email;
     private String username;
+    private String phone;
     private String passwordHash;
     @Enumerated(EnumType.STRING)
     private Role role;
@@ -49,6 +51,8 @@ public class Account {
     public String getUsername() { return username; }
     /** What to show and put in the token: username if set, else email. */
     public String getLoginName() { return username != null ? username : email; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
     public String getPasswordHash() { return passwordHash; }
     public Role getRole() { return role; }
     public Status getStatus() { return status; }

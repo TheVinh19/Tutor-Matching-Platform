@@ -1,0 +1,44 @@
+# Built-in platform rules the assistant answers from, next to the FAQ kept by customer care (P17).
+# Format: "## ID | question | tags" starts an entry; the lines below it are the answer. Keep numbers in sync with booking's Schedule and Cases.
+
+## POL-HOLD | Đặt học xong bao lâu thì gia sư xác nhận? | đặt học, giữ lịch, xác nhận, chờ, hết hạn, yêu cầu
+Khi bạn gửi yêu cầu đặt học, lịch của gia sư được giữ 24 giờ. Gia sư cần xác nhận trong 24 giờ; quá hạn thì yêu cầu hết hạn và lịch được nhả. Đề xuất phải được chốt ít nhất 12 giờ trước buổi học đầu tiên.
+
+## POL-SESSION | Một buổi học dài bao lâu và học vào giờ nào? | buổi học, thời lượng, kéo dài, mấy phút, khung giờ, giờ học
+Mỗi buổi học dài 120 phút, nằm trong khung 08:00 đến 22:00. Hai buổi liên tiếp của cùng một gia sư cách nhau ít nhất 60 phút.
+
+## POL-PERIOD | Một kỳ học kéo dài bao nhiêu tuần? | kỳ học, tuần, thời hạn, kế hoạch
+Kỳ học mặc định 4 tuần, tối đa 26 tuần, học theo các khung giờ cố định hằng tuần mà hai bên đã chốt.
+
+## POL-START | Gia sư vào lớp muộn thì sao? | bắt đầu, muộn, trễ, vào lớp, đi muộn, gia sư muộn
+Gia sư bấm bắt đầu buổi sớm nhất 15 phút trước giờ học. Bắt đầu muộn quá 10 phút so với giờ hẹn sẽ được ghi nhận là đi muộn.
+
+## POL-ABSENT | Bên kia không vào lớp thì báo vắng thế nào? | vắng, vắng mặt, không đến, không vào lớp, báo vắng
+Sau 15 phút kể từ giờ bắt đầu mà bên kia chưa vào lớp, bạn có thể báo vắng mặt ngay trên thẻ buổi học. Vắng mặt của học viên đã xác minh được tính là vi phạm.
+
+## POL-CANCEL | Muốn hủy hoặc báo bận một buổi học thì làm sao? | hủy buổi, báo bận, nghỉ, hoãn, đổi lịch buổi, dời buổi
+Bấm báo bận/hủy trên thẻ buổi học. Buổi đó chuyển sang đổi lịch: hai bên có 24 giờ (hoặc tới giờ học, tùy mốc nào đến trước) để chọn giờ mới, có thể chọn ngày trong vòng 56 ngày. Không chọn được giờ mới thì buổi bị hủy.
+
+## POL-SLOT | Đổi khung giờ học cố định trong kỳ được không? | đổi khung giờ, đổi giờ cố định, đổi lịch cố định, đổi giờ học
+Được. Gửi yêu cầu đổi khung giờ hằng tuần trong trang kỳ học; bên kia có 24 giờ (hoặc tới buổi đầu tiên bị ảnh hưởng) để đồng ý. Khi gia hạn cũng có thể chọn khung giờ mới.
+
+## POL-RENEW | Gia hạn kỳ học như thế nào? | gia hạn, hết kỳ, kỳ mới, tiếp tục học, nhắc gia hạn
+Hệ thống nhắc gia hạn 14 ngày trước khi kỳ kết thúc. Bạn gửi yêu cầu gia hạn trong trang kỳ học, có thể giữ hoặc đổi khung giờ; gia sư xác nhận thì kỳ mới nối tiếp kỳ cũ và bảng điểm được nối qua các kỳ.
+
+## POL-STRIKE | Bị khóa đặt đơn vì sao và bao lâu? | vi phạm, khóa, bị khóa, cảnh báo, cấm đặt, tạm khóa
+Tự hủy sát giờ hoặc vắng mặt đã xác minh được tính là một vi phạm. Vi phạm thứ 3 trong 90 ngày sẽ khóa đặt đơn mới 30 ngày; các kỳ đã trả vẫn học bình thường. Nếu thấy không đúng, bạn có thể kháng nghị để admin xem lại.
+
+## POL-CASE | Có tranh chấp với gia sư thì xử lý ra sao? | tranh chấp, khiếu nại, vụ việc, bằng chứng, kháng nghị, phản ánh
+Vụ việc của một buổi học mở khi có tranh chấp hoặc báo vắng bị phản đối. Hai bên nộp bằng chứng trong 72 giờ. Nhân viên CSKH tiếp nhận, liên hệ hai bên và đề xuất; admin là người kết luận. Không đồng ý kết luận thì có thể kháng nghị.
+
+## POL-RANK | Hạng gia sư được tính thế nào? | hạng, exp, điểm kinh nghiệm, lên hạng, xếp hạng gia sư
+Hạng của gia sư dựa trên EXP tích lũy từ các buổi học hoàn thành và nhận xét của học viên. Hồ sơ mới vào Hạng 1, hoặc Hạng 2 nếu có đủ minh chứng bằng cấp và kinh nghiệm từ 1 năm. Admin xét lên Hạng khi gia sư đủ điều kiện.
+
+## POL-GRADEBOOK | Xem bảng điểm và tiến bộ ở đâu? | bảng điểm, tiến bộ, kết quả, điểm theo chủ đề, sổ điểm
+Bảng điểm nằm trong trang kỳ học: liệt kê bài đầu vào, định kỳ, cuối kỳ với điểm theo từng chủ đề, so sánh điểm đầu vào với bài gần nhất, nối qua các kỳ đã gia hạn.
+
+## POL-VIDEO | Gia sư giới thiệu bản thân bằng video ở đâu? | video, youtube, giới thiệu, hồ sơ gia sư
+Gia sư dán đường dẫn video YouTube vào hồ sơ; video hiện trên trang hồ sơ sau khi được duyệt.
+
+## POL-ASSISTANT | Trợ lý AI làm được gì? | trợ lý, chatbot, ai, hỏi đáp, bot
+Trợ lý trả lời câu hỏi về quy định và cách dùng hệ thống, kèm nguồn; giải thích câu làm sai trong bài kiểm tra và gợi ý chủ đề cần ôn. Trợ lý không tra cứu lịch, thanh toán hay dữ liệu riêng của bạn và không thao tác thay bạn. Câu nào trợ lý chưa trả lời được sẽ chuyển thành phiếu cho nhân viên CSKH.

@@ -3,13 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, ErrorBox, PageTitle } from "@/components/common";
 import { useLoad } from "@/hooks/use-load";
 import { SessionCard } from "@/features/booking/session-card";
-import type { Session } from "@/types/api";
+import type { Session, SessionStatus } from "@/types/api";
+
+/** Past sessions that still wait for someone stay in the upcoming list. */
+const NEEDS_ACTION: SessionStatus[] = ["SCHEDULED", "IN_PROGRESS", "CANCEL_REPORTED", "COMPLETED_PENDING_CONFIRM", "LEARNER_ABSENT_PENDING"];
 
 /** Sessions from 7 days ago to 60 days ahead, split into "needs action / upcoming" and "past". */
 export function ScheduleView({ role }: { role: "LEARNER" | "TUTOR" }) {
   const { data, error, reload } = useLoad<Session[]>("/v1/bookings/sessions/me");
   const now = Date.now();
-  const upcoming = data?.filter((s) => new Date(s.endAt).getTime() >= now || s.status === "SCHEDULED" || s.status === "COMPLETED_PENDING_CONFIRM") ?? [];
+  const upcoming = data?.filter((s) => new Date(s.endAt).getTime() >= now || NEEDS_ACTION.includes(s.status)) ?? [];
   const past = data?.filter((s) => !upcoming.includes(s)) ?? [];
   return (
     <>

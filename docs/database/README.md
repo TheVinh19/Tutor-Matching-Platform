@@ -1,6 +1,6 @@
 # Database và migration
 
-Mỗi service sở hữu database và role riêng. `infra/postgres/init.sql` tạo role/database khi PostgreSQL khởi tạo volume mới; chưa tạo bảng nghiệp vụ.
+Mỗi service sở hữu database và role riêng. `infra/postgres/init.sql` và `infra/postgres/init-p16-p18.sql` tạo role/database khi PostgreSQL khởi tạo volume mới; bảng nghiệp vụ do Flyway của từng service tạo. Volume cũ chạy lại `init-p16-p18.sql` theo README gốc.
 
 | Service | Database | Role | Dữ liệu thuộc phạm vi thiết kế |
 |---|---|---|---|
@@ -9,8 +9,11 @@ Mỗi service sở hữu database và role riêng. `infra/postgres/init.sql` t�
 | booking-service | learning_db | learning_app | Kết nối, trao đổi, lịch rảnh, kế hoạch/phiên bản, giữ lịch, kỳ/buổi, cam kết bù, vụ việc, bằng chứng và kháng nghị |
 | payment-service | payment_db | payment_app | Bảng giá, giao dịch, sổ tiền, hoàn, thu hồi, đối soát và chi mô phỏng |
 | notification-service | notification_db | notification_app | Thông báo web, email và lịch sử gửi |
+| assessment-service | assessment_db | assessment_app | Ngân hàng câu hỏi, bài kiểm tra, lượt làm, câu trả lời |
+| care-service | care_db | care_app | Phiếu hỗ trợ, FAQ, khoảng trống FAQ, tầng chăm sóc, việc cần gọi, nhật ký liên hệ, nhật ký xem số điện thoại |
+| ai-service | ai_db | ai_app | Lượt hỏi đáp của trợ lý, phản hồi hữu ích, phiếu đã chuyển |
 
-`ai-service` là placeholder README, chưa có database. ERD, tên bảng và cột chưa được chốt trong khung này. Khi thiết kế, lưu ERD tại `docs/database/erd.md` và thêm migration tại `server/services/<service>/src/main/resources/db/migration`.
+Khi thiết kế, lưu ERD tại `docs/database/erd.md` và thêm migration tại `server/services/<service>/src/main/resources/db/migration`.
 
 Không tạo foreign key xuyên database. Lưu ID tham chiếu và snapshot cần thiết, kiểm tra liên service qua contract. Thiết kế outbox, chống lặp và khóa xung đột lịch cùng domain; không thêm bảng mẫu thiếu mục đích.
 

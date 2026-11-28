@@ -14,8 +14,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -33,7 +36,10 @@ class AuthController {
     /** login = username, or email for accounts that have one (the demo accounts). */
     record LoginRequest(@NotBlank @Size(max = 254) String login, @NotBlank @Size(max = 128) String password) {}
     record LoginResponse(String accessToken, String tokenType, long expiresIn, Account.Role role, UUID accountId) {}
-    record MeResponse(UUID accountId, String username, String email, Account.Role role, Account.Status status) {}
+    record MeResponse(UUID accountId, String username, String email, String phone, Account.Role role, Account.Status status) {}
+    record PhoneRequest(@NotBlank @Pattern(regexp = "0[0-9]{9}", message = "Số điện thoại gồm 10 chữ số, bắt đầu bằng 0") String phone) {}
+    /** For booking-service only: contact shown to the other party of a confirmed plan. */
+    record ContactResponse(UUID accountId, String phone) {}
 
     enum SignUpRole { LEARNER, TUTOR }
     record RegisterRequest(
@@ -90,9 +96,28 @@ class AuthController {
 
     @GetMapping("/me")
     MeResponse me(@AuthenticationPrincipal Jwt jwt) {
-        Account account = accounts.findById(UUID.fromString(jwt.getSubject()))
+        Account account = current(jwt);
+        return new MeResponse(account.getId(), account.getUsername(), account.getEmail(), account.getPhone(), account.getRole(), account.getStatus());
+    }
+
+    // shortcut: phone is not verified (no OTP); verify it together with email when the sign-up verification task lands.
+    @PutMapping("/me/phone")
+    @Transactional
+    MeResponse setPhone(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PhoneRequest request) {
+        current(jwt).setPhone(request.phone());
+        return me(jwt);
+    }
+
+    @GetMapping("/internal/accounts/{id}/contact")
+    ContactResponse contact(@PathVariable UUID id) {
+        Account account = accounts.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "Không tìm thấy tài khoản"));
+        return new ContactResponse(account.getId(), account.getPhone());
+    }
+
+    private Account current(Jwt jwt) {
+        return accounts.findById(UUID.fromString(jwt.getSubject()))
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Tài khoản không còn tồn tại"));
-        return new MeResponse(account.getId(), account.getUsername(), account.getEmail(), account.getRole(), account.getStatus());
     }
 
     private static ApiException usernameTaken() {

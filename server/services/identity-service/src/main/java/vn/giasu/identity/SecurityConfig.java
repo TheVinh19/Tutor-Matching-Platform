@@ -14,6 +14,7 @@ class SecurityConfig {
         return ApiSecurity.stateless(http).authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/identity/auth/login", "/api/v1/identity/auth/register").permitAll()
+                .requestMatchers("/api/v1/identity/internal/**").hasRole("SERVICE")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().denyAll()).build();
     }

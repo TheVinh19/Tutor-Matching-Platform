@@ -18,6 +18,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import vn.giasu.common.web.ApiException;
+import vn.giasu.tutor.experience.ExpLedger;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import vn.giasu.tutor.ranks.RankFlags;
+import vn.giasu.tutor.ranks.RankRules;
 import vn.giasu.tutor.profiles.ProfileStore.Mode;
 import vn.giasu.tutor.profiles.ProfileStore.Profile;
 import vn.giasu.tutor.profiles.ProfileStore.Status;
@@ -33,20 +37,29 @@ class TutorProfileController {
                           @NotNull @Size(max = 30) List<@Valid @NotNull SubjectLevelRequest> subjects,
                           @NotNull @Size(max = 20) List<@NotBlank @Size(max = 32) String> areaCodes) {}
 
-    /** What anyone may see: approved profiles only, no review notes. */
+    /**
+     * What anyone may see: approved profiles with an approved video, no review notes. P12 public numbers: taught sessions, rank
+     * completion rate (null = no data yet), verified tutor-fault failures; "Mới tham gia" for 30 days after the first approval.
+     */
     record PublicProfile(UUID accountId, String fullName, String bio, String experience, Mode teachingMode, int rank,
-                         List<SubjectLevel> subjects, List<String> areaCodes) {
-        static PublicProfile of(Profile p) {
-            return new PublicProfile(p.accountId(), p.fullName(), p.bio(), p.experience(), p.teachingMode(), p.rank(), p.subjects(), p.areaCodes());
-        }
-    }
+                         List<SubjectLevel> subjects, List<String> areaCodes, int taughtSessions, Double completionRate, int tutorFaultFailed,
+                         List<String> videos, boolean newcomer) {}
 
     /** For booking-service: is this tutor allowed to take learners. */
-    record InternalProfile(UUID accountId, String fullName, Status status, Mode teachingMode, int rank, List<SubjectLevel> subjects) {}
+    record InternalProfile(UUID accountId, String fullName, Status status, Mode teachingMode, int rank, List<SubjectLevel> subjects,
+                           boolean rankUnderReview) {}
 
     private final ProfileStore store;
+    private final ExpLedger ledger;
+    private final RankFlags flags;
+    private final JdbcClient jdbc;
 
-    TutorProfileController(ProfileStore store) { this.store = store; }
+    TutorProfileController(ProfileStore store, ExpLedger ledger, RankFlags flags, JdbcClient jdbc) {
+        this.store = store;
+        this.ledger = ledger;
+        this.flags = flags;
+        this.jdbc = jdbc;
+    }
 
     @GetMapping("/api/v1/tutors/me/profile")
     @PreAuthorize("hasRole('TUTOR')")
@@ -94,14 +107,24 @@ class TutorProfileController {
 
     @GetMapping("/api/v1/tutors/{accountId}")
     PublicProfile publicProfile(@PathVariable UUID accountId) {
-        return store.find(accountId).filter(p -> p.status() == Status.APPROVED).map(PublicProfile::of)
+        Profile p = store.find(accountId).filter(x -> x.status() == Status.APPROVED)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "TUTOR_NOT_FOUND", "Không tìm thấy gia sư"));
+        List<String> videos = jdbc.sql("SELECT url FROM tutor_videos WHERE account_id = ? AND status = 'APPROVED' ORDER BY created_at")
+                .param(accountId).query(String.class).list();
+        if (videos.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "TUTOR_NOT_FOUND", "Không tìm thấy gia sư"); // P12: not public yet
+        boolean newcomer = jdbc.sql("""
+                SELECT coalesce(min(created_at) > now() - interval '30 days', false) FROM approval_history WHERE account_id = ? AND action = 'APPROVE'""")
+                .param(accountId).query(Boolean.class).single();
+        ExpLedger.Stats s = ledger.stats(accountId);
+        return new PublicProfile(p.accountId(), p.fullName(), p.bio(), p.experience(), p.teachingMode(), p.rank(), p.subjects(), p.areaCodes(),
+                s.taughtSessions(), RankRules.completionRate(s.taughtSessions(), s.tutorFaultFailed()), s.tutorFaultFailed(), videos, newcomer);
     }
 
     @GetMapping("/api/v1/tutors/internal/profiles/{accountId}")
     InternalProfile internalProfile(@PathVariable UUID accountId) {
         return store.find(accountId)
-                .map(p -> new InternalProfile(p.accountId(), p.fullName(), p.status(), p.teachingMode(), p.rank(), p.subjects()))
+                .map(p -> new InternalProfile(p.accountId(), p.fullName(), p.status(), p.teachingMode(), p.rank(), p.subjects(),
+                        flags.underReview(accountId)))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "TUTOR_NOT_FOUND", "Không tìm thấy gia sư"));
     }
 
